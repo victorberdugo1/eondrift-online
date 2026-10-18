@@ -19,7 +19,7 @@ const parsers = {
         name: sanitizeName(message.name, nameMaxLength),
         ship: optionalString(message.ship),
         track: optionalString(message.track),
-        mode: message.mode === 'deathmatch' ? 'deathmatch' : 'race',
+        mode: message.mode === 'deathmatch' || message.mode === 'vs' ? message.mode : 'race',
     }),
     input: (message) => {
         if (!Number.isSafeInteger(message.seq) || message.seq < 0) return null;

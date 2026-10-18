@@ -29,11 +29,11 @@ const fakePlayer = (id, ship, inbox = []) => {
     return player;
 };
 
-const createRace = (config, shipNames) => {
+const createRace = (config, shipNames, track = circleTrack) => {
     const inboxes = shipNames.map(() => []);
     const players = shipNames.map((ship, i) => fakePlayer(i + 1, ship, inboxes[i]));
     let closed = false;
-    const room = new Room({ id: 'r1', trackId: 'circle', track: circleTrack, config, onClose: () => (closed = true) });
+    const room = new Room({ id: 'r1', trackId: 'circle', track, config, onClose: () => (closed = true) });
     players.forEach((player) => room.add(player));
     return { room, players, inboxes, isClosed: () => closed };
 };

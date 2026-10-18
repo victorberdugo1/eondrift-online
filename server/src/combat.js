@@ -15,6 +15,7 @@ const createFighter = ({ maxHealth, maxEnergy }) => ({
     cooldowns: {},
     disabledTicks: 0,
     defeated: false,
+    defeatOrder: 0,
 });
 
 const createCombat = ({ config, track, deathmatch = false }) => {
@@ -23,6 +24,7 @@ const createCombat = ({ config, track, deathmatch = false }) => {
     const ticks = (seconds) => Math.round(seconds * config.tickRate);
     let shots = [];
     let nextShotId = 1;
+    let defeats = 0;
 
     const isActive = (player) => player.finishTime === null && player.fighter.disabledTicks === 0;
 
@@ -50,6 +52,7 @@ const createCombat = ({ config, track, deathmatch = false }) => {
             distance: sim.distance,
             lateral: sim.lateral,
             speed: sim.speed + SPELLS[spell].projectile.speed,
+            heading: SPELLS[spell].projectile.homing > 0 ? 0 : sim.heading,
             age: 0,
             target: SPELLS[spell].projectile.homing > 0 ? (nearestAhead(shooter, players)?.id ?? null) : null,
         });
@@ -83,6 +86,7 @@ const createCombat = ({ config, track, deathmatch = false }) => {
     const defeat = (player) => {
         player.fighter.health = 0;
         player.fighter.defeated = true;
+        player.fighter.defeatOrder = ++defeats;
         player.fighter.disabledTicks = Number.MAX_SAFE_INTEGER;
         player.sim.boost = 0;
     };
@@ -106,7 +110,13 @@ const createCombat = ({ config, track, deathmatch = false }) => {
         const projectile = SPELLS[shot.spell].projectile;
         const before = shot.distance;
         shot.age += dt;
-        shot.distance += shot.speed * dt;
+        if (projectile.homing > 0) {
+            shot.distance += shot.speed * dt;
+        } else {
+            shot.heading += track.curvatureAt(shot.distance) * shot.speed * Math.cos(shot.heading) * dt;
+            shot.distance += shot.speed * Math.cos(shot.heading) * dt;
+            shot.lateral += shot.speed * Math.sin(shot.heading) * dt;
+        }
 
         const target = players.find((player) => player.id === shot.target && isActive(player));
         if (target) shot.lateral = moveToward(shot.lateral, target.sim.lateral, projectile.homing * dt);
@@ -119,6 +129,7 @@ const createCombat = ({ config, track, deathmatch = false }) => {
     return {
         start: (players) => {
             shots = [];
+            defeats = 0;
             for (const player of players) player.fighter = createFighter(combat);
         },
         step: (players) => {

@@ -43,7 +43,7 @@ module.exports = Object.freeze({
         finishGraceSeconds: 30,
         raceTimeoutSeconds: 600,
         gridSpacing: 4.5,
-        deathmatchMaxPlayers: 2,
+        versusMaxPlayers: 2,
         deathmatchTimeoutSeconds: 180,
     }),
 });

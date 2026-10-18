@@ -39,7 +39,7 @@ class Room {
     }
 
     get maxPlayers() {
-        return this.deathmatch ? this.config.room.deathmatchMaxPlayers : this.config.room.maxPlayers;
+        return this.mode === 'vs' ? this.config.room.versusMaxPlayers : this.config.room.maxPlayers;
     }
 
     isOpen() {
@@ -161,7 +161,7 @@ class Room {
     }
 
     deathmatchRanking() {
-        const standing = (player) => (player.fighter.defeated ? -1 : player.fighter.health);
+        const standing = (player) => (player.fighter.defeated ? player.fighter.defeatOrder - 1000 : player.fighter.health);
         return [...this.players.values()].sort((a, b) => standing(b) - standing(a)).map((player) => ({ id: player.id, time: null }));
     }
 
@@ -238,7 +238,7 @@ class Room {
             ]),
         );
         const shots = JSON.stringify(
-            this.combat.shots().map(({ id, spell, distance, lateral, speed }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed)]),
+            this.combat.shots().map(({ id, spell, distance, lateral, speed, heading }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed), round(heading, 3)]),
         );
         const head = `{"t":"state","tick":${this.raceTick},"ack":`;
         for (const player of this.players.values()) {
