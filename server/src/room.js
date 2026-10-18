@@ -178,6 +178,7 @@ class Room {
     }
 
     finish() {
+        if (this.phase === PHASE.RUNNING) this.broadcastState();
         this.broadcast({ t: 'results', ranking: this.ranking() });
         for (const player of this.players.values()) {
             player.room = null;
