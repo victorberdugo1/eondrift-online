@@ -1,6 +1,7 @@
 'use strict';
 
 const { SHIPS } = require('./content');
+const { clamp, moveToward } = require('./math');
 
 const ACCELERATION = 50;
 const BRAKING = 100;
@@ -18,13 +19,6 @@ const WALL_BOUNCE_HEADING = 0.25;
 const BRAKE_GLOW_RATE = 8;
 const REFERENCE_SPEED = 277.5;
 const BOOST_ACCELERATION = 150;
-
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
-const moveToward = (value, target, maxDelta) => {
-    const delta = target - value;
-    return Math.abs(delta) <= maxDelta ? target : value + Math.sign(delta) * maxDelta;
-};
 
 const resolveWall = (ship, limit, dt) => {
     if (Math.abs(ship.lateral) < limit) return;

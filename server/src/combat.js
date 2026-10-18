@@ -1,32 +1,17 @@
 'use strict';
 
-const { SHIPS, SPELLS } = require('./content');
+const { SPELLS } = require('./content');
 const { wrapDelta } = require('./collisions');
 const { SHIP_RADIUS } = require('./ship');
+const { moveToward } = require('./math');
+const { createFighter, tickFighter, isActive, castSpell, outgoingDamage, incomingDamage } = require('./fighter');
 
-const moveToward = (value, target, maxDelta) => {
-    const delta = target - value;
-    return Math.abs(delta) <= maxDelta ? target : value + Math.sign(delta) * maxDelta;
-};
-
-const createFighter = ({ maxHealth, maxEnergy }) => ({
-    health: maxHealth,
-    energy: maxEnergy,
-    cooldowns: {},
-    disabledTicks: 0,
-    defeated: false,
-    defeatOrder: 0,
-});
-
-const createCombat = ({ config, track, deathmatch = false }) => {
+const createCombat = ({ config, track }) => {
     const { combat } = config;
     const dt = 1 / config.tickRate;
     const ticks = (seconds) => Math.round(seconds * config.tickRate);
     let shots = [];
     let nextShotId = 1;
-    let defeats = 0;
-
-    const isActive = (player) => player.finishTime === null && player.fighter.disabledTicks === 0;
 
     const nearestAhead = (shooter, players) => {
         let best = null;
@@ -42,38 +27,25 @@ const createCombat = ({ config, track, deathmatch = false }) => {
         return best;
     };
 
-    const fire = (shooter, spell, players) => {
+    const fire = (shooter, spell, projectile, players) => {
         const { sim } = shooter;
         shots.push({
             id: nextShotId++,
             spell,
             owner: shooter.id,
-            damage: SPELLS[spell].projectile.damage * (SHIPS[sim.name].attack / combat.referenceAttack),
+            damage: outgoingDamage(combat, sim.name, projectile),
             distance: sim.distance,
             lateral: sim.lateral,
-            speed: sim.speed + SPELLS[spell].projectile.speed,
-            heading: SPELLS[spell].projectile.homing > 0 ? 0 : sim.heading,
+            speed: sim.speed + projectile.speed,
+            heading: projectile.homing > 0 ? 0 : sim.heading,
             age: 0,
-            target: SPELLS[spell].projectile.homing > 0 ? (nearestAhead(shooter, players)?.id ?? null) : null,
+            target: projectile.homing > 0 ? (nearestAhead(shooter, players)?.id ?? null) : null,
         });
     };
 
     const cast = (shooter, spell, players) => {
-        const spec = SPELLS[spell];
-        const { fighter, sim } = shooter;
-        if (!isActive(shooter) || fighter.energy < spec.cost || (fighter.cooldowns[spell] ?? 0) > 0) return;
-
-        fighter.energy -= spec.cost;
-        fighter.cooldowns[spell] = ticks(spec.cooldown);
-        if (spec.boost) sim.boost = Math.max(sim.boost, spec.boost);
-        else fire(shooter, spell, players);
-    };
-
-    const tickFighter = (player) => {
-        const { fighter } = player;
-        fighter.energy = Math.min(combat.maxEnergy, fighter.energy + combat.energyPerSecond * dt);
-        fighter.disabledTicks = Math.max(0, fighter.disabledTicks - 1);
-        for (const spell of Object.keys(fighter.cooldowns)) fighter.cooldowns[spell] = Math.max(0, fighter.cooldowns[spell] - 1);
+        const projectile = castSpell(shooter, spell, ticks);
+        if (projectile) fire(shooter, spell, projectile, players);
     };
 
     const disable = (player) => {
@@ -83,19 +55,9 @@ const createCombat = ({ config, track, deathmatch = false }) => {
         player.sim.boost = 0;
     };
 
-    const defeat = (player) => {
-        player.fighter.health = 0;
-        player.fighter.defeated = true;
-        player.fighter.defeatOrder = ++defeats;
-        player.fighter.disabledTicks = Number.MAX_SAFE_INTEGER;
-        player.sim.boost = 0;
-    };
-
     const damage = (player, amount) => {
-        player.fighter.health -= (amount * combat.referenceShield) / SHIPS[player.sim.name].shield;
-        if (player.fighter.health > 0) return;
-        if (deathmatch) defeat(player);
-        else disable(player);
+        player.fighter.health -= incomingDamage(combat, player.sim.name, amount);
+        if (player.fighter.health <= 0) disable(player);
     };
 
     const sweepsThrough = (shot, projectile, before, player) => {
@@ -129,12 +91,11 @@ const createCombat = ({ config, track, deathmatch = false }) => {
     return {
         start: (players) => {
             shots = [];
-            defeats = 0;
             for (const player of players) player.fighter = createFighter(combat);
         },
         step: (players) => {
             for (const player of players) {
-                tickFighter(player);
+                tickFighter(player, combat, dt);
                 for (const spell of player.casts.splice(0)) cast(player, spell, players);
             }
             shots = shots.filter((shot) => advance(shot, players));

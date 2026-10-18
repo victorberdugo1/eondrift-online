@@ -12,10 +12,10 @@ const startServer = async (config = fastConfig) => {
     return { server, port };
 };
 
-const joinAs = async (port, name, ship) => {
+const joinAs = async (port, name, ship, options = {}) => {
     const client = await connect(port);
     await client.waitFor((m) => m.t === 'hello');
-    client.send({ t: 'join', name, ship });
+    client.send({ t: 'join', name, ship, ...options });
     const joined = await client.waitFor((m) => m.t === 'joined');
     return { client, joined };
 };
@@ -186,6 +186,24 @@ test('casts are ignored in the lobby and spend energy once the race runs', async
         (m) => m.t === 'state' && m.ships.find((s) => s[0] === a.joined.id)?.[9] < 96 && m.shots.some(([, spell]) => spell === 'gun'),
     );
     assert.equal(fired.ships.find((s) => s[0] === a.joined.id)[8], 100);
+
+    await a.client.close();
+    await b.client.close();
+    await server.close();
+});
+
+test('deathmatch clients are matched into the arena and receive plane snapshots', async () => {
+    const { server, port } = await startServer();
+    const a = await joinAs(port, 'Ana', 'SERAPH', { mode: 'deathmatch', track: 'nowhere' });
+    const b = await joinAs(port, 'Bo', 'IMPERATOR', { mode: 'deathmatch' });
+
+    const lobby = await a.client.waitFor((m) => m.t === 'room' && m.players.length === 2);
+    assert.equal(lobby.mode, 'deathmatch');
+    assert.equal(lobby.track, 'battle');
+    await a.client.waitFor((m) => m.t === 'room' && m.phase === 'running');
+
+    const state = await a.client.waitFor((m) => m.t === 'state' && m.ships.length === 2);
+    assert.ok(state.ships.every((ship) => Math.abs(ship[1]) < 130 && Math.abs(ship[2]) < 130 && ship[7] === null));
 
     await a.client.close();
     await b.client.close();

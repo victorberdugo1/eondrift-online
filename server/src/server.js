@@ -3,8 +3,9 @@
 const http = require('node:http');
 const { WebSocketServer } = require('ws');
 const defaultConfig = require('./config');
-const { TRACKS } = require('./content');
+const { TRACKS, ARENAS } = require('./content');
 const { buildTracks } = require('./track');
+const { buildArenas } = require('./arena');
 const { createMatchmaker } = require('./matchmaker');
 const { createGateway } = require('./gateway');
 const { createLoop } = require('./loop');
@@ -21,8 +22,8 @@ const clientIp = (req, trustProxy) => {
     return forwarded ? forwarded.split(',').at(-1).trim() : req.socket.remoteAddress;
 };
 
-const createServer = ({ config = defaultConfig, tracks = buildTracks(TRACKS) } = {}) => {
-    const matchmaker = createMatchmaker({ config, tracks });
+const createServer = ({ config = defaultConfig, tracks = buildTracks(TRACKS), arenas = buildArenas(ARENAS) } = {}) => {
+    const matchmaker = createMatchmaker({ config, tracks, arenas });
     const gateway = createGateway({ config, matchmaker });
     const loop = createLoop(1000 / config.tickRate, matchmaker.step);
     const wss = new WebSocketServer({ noServer: true, maxPayload: config.maxPayloadBytes });

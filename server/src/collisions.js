@@ -67,4 +67,4 @@ const createCollisions = ({ config, track }) => {
     };
 };
 
-module.exports = { createCollisions, wrapDelta };
+module.exports = { createCollisions, inverseMass, wrapDelta };

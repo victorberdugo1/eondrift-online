@@ -14,12 +14,12 @@ const round = (value, digits) => {
 const percent = (value, max) => Math.round((value / max) * 100);
 
 class Room {
-    constructor({ id, trackId, mode = 'race', track, config, onClose }) {
+    constructor({ id, trackId, mode = 'race', track, arena, config, onClose }) {
         this.id = id;
         this.trackId = trackId;
         this.mode = mode;
-        this.deathmatch = mode === 'deathmatch';
         this.track = track;
+        this.arena = arena;
         this.config = config;
         this.onClose = onClose;
         this.dt = 1 / config.tickRate;
@@ -30,8 +30,20 @@ class Room {
         this.tick = 0;
         this.raceTick = 0;
         this.firstFinishTick = null;
-        this.combat = createCombat({ config, track, deathmatch: this.deathmatch });
-        this.collisions = createCollisions({ config, track });
+        this.combat = this.createCombat();
+        this.collisions = this.createCollisions();
+    }
+
+    createCombat() {
+        return createCombat({ config: this.config, track: this.track });
+    }
+
+    createCollisions() {
+        return createCollisions({ config: this.config, track: this.track });
+    }
+
+    get laps() {
+        return this.track.laps;
     }
 
     ticks(seconds) {
@@ -76,22 +88,20 @@ class Room {
         this.phaseTicks = this.phaseTicks === null ? target : Math.min(this.phaseTicks, target);
     }
 
+    spawn(players) {
+        const { gridSpacing } = this.config.room;
+        players.forEach((player, slot) => {
+            player.startLateral = (slot - (players.length - 1) / 2) * gridSpacing;
+            player.sim = createShip(player.shipName, player.startLateral);
+        });
+    }
+
     startCountdown() {
-        const { gridSpacing, countdownSeconds } = this.config.room;
-        const count = this.players.size;
-        let slot = 0;
-        for (const player of this.players.values()) {
-            if (this.deathmatch) {
-                player.startLateral = 0;
-                player.sim = createShip(player.shipName, 0, (slot++ * this.track.length) / count);
-            } else {
-                player.startLateral = (slot++ - (count - 1) / 2) * gridSpacing;
-                player.sim = createShip(player.shipName, player.startLateral);
-            }
-        }
-        this.combat.start([...this.players.values()]);
+        const players = [...this.players.values()];
+        this.spawn(players);
+        this.combat.start(players);
         this.phase = PHASE.COUNTDOWN;
-        this.phaseTicks = this.ticks(countdownSeconds);
+        this.phaseTicks = this.ticks(this.config.room.countdownSeconds);
         this.raceTick = 0;
         this.firstFinishTick = null;
         this.broadcastRoom();
@@ -134,7 +144,7 @@ class Room {
             const throttle = driving ? player.input.throttle : 0;
             const before = player.sim.distance;
             stepShip(player.sim, this.track, steer, throttle, this.dt);
-            if (racing && !finished && !this.deathmatch && player.sim.distance >= finishDistance) {
+            if (racing && !finished && player.sim.distance >= finishDistance) {
                 const crossed = (finishDistance - before) / (player.sim.distance - before);
                 player.finishTime = (this.raceTick + crossed) * this.dt;
                 this.firstFinishTick ??= this.raceTick + 1;
@@ -148,25 +158,13 @@ class Room {
     }
 
     finishIfOver() {
-        if (this.deathmatch) return this.finishDeathmatchIfOver();
         const { finishGraceSeconds, raceTimeoutSeconds } = this.config.room;
         const everyoneFinished = [...this.players.values()].every((player) => player.finishTime !== null);
         const graceOver = this.firstFinishTick !== null && this.raceTick - this.firstFinishTick >= this.ticks(finishGraceSeconds);
         if (everyoneFinished || graceOver || this.raceTick >= this.ticks(raceTimeoutSeconds)) this.finish();
     }
 
-    finishDeathmatchIfOver() {
-        const alive = [...this.players.values()].filter((player) => !player.fighter.defeated);
-        if (alive.length <= 1 || this.raceTick >= this.ticks(this.config.room.deathmatchTimeoutSeconds)) this.finish();
-    }
-
-    deathmatchRanking() {
-        const standing = (player) => (player.fighter.defeated ? player.fighter.defeatOrder - 1000 : player.fighter.health);
-        return [...this.players.values()].sort((a, b) => standing(b) - standing(a)).map((player) => ({ id: player.id, time: null }));
-    }
-
     ranking() {
-        if (this.deathmatch) return this.deathmatchRanking();
         const players = [...this.players.values()];
         const finished = players.filter((player) => player.finishTime !== null).sort((a, b) => a.finishTime - b.finishTime);
         const unfinished = players.filter((player) => player.finishTime === null).sort((a, b) => b.sim.distance - a.sim.distance);
@@ -197,7 +195,7 @@ class Room {
             id: this.id,
             track: this.trackId,
             mode: this.mode,
-            laps: this.track.laps,
+            laps: this.laps,
             phase: this.phase,
             endsIn: this.phaseTicks === null ? null : Math.round((this.phaseTicks / this.config.tickRate) * 1000),
             players: [...this.players.values()].map((player) => ({
@@ -222,24 +220,30 @@ class Room {
         for (const player of this.players.values()) player.sendRaw(text, false);
     }
 
+    shipRows() {
+        return [...this.players.values()].map(({ id, sim, finishTime, fighter }) => [
+            id,
+            round(sim.distance, 3),
+            round(sim.lateral, 3),
+            round(sim.heading, 4),
+            round(sim.speed, 2),
+            round(sim.roll, 4),
+            round(sim.brakeGlow, 2),
+            finishTime === null ? null : round(finishTime, 3),
+            percent(fighter.health, this.config.combat.maxHealth),
+            percent(fighter.energy, this.config.combat.maxEnergy),
+        ]);
+    }
+
+    shotRows() {
+        return this.combat
+            .shots()
+            .map(({ id, spell, distance, lateral, speed, heading, age }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed), round(heading, 3), round(age, 3)]);
+    }
+
     broadcastState() {
-        const ships = JSON.stringify(
-            [...this.players.values()].map(({ id, sim, finishTime, fighter }) => [
-                id,
-                round(sim.distance, 3),
-                round(sim.lateral, 3),
-                round(sim.heading, 4),
-                round(sim.speed, 2),
-                round(sim.roll, 4),
-                round(sim.brakeGlow, 2),
-                finishTime === null ? null : round(finishTime, 3),
-                percent(fighter.health, this.config.combat.maxHealth),
-                percent(fighter.energy, this.config.combat.maxEnergy),
-            ]),
-        );
-        const shots = JSON.stringify(
-            this.combat.shots().map(({ id, spell, distance, lateral, speed, heading, age }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed), round(heading, 3), round(age, 3)]),
-        );
+        const ships = JSON.stringify(this.shipRows());
+        const shots = JSON.stringify(this.shotRows());
         const head = `{"t":"state","tick":${this.raceTick},"ack":`;
         for (const player of this.players.values()) {
             player.sendRaw(`${head}${player.input.seq},"ships":${ships},"shots":${shots}}`, true);
@@ -247,4 +251,4 @@ class Room {
     }
 }
 
-module.exports = { Room, PHASE };
+module.exports = { Room, PHASE, round, percent };

@@ -249,58 +249,10 @@ test('snapshots carry health, energy and shots', () => {
     assert.equal(state.shots[0].length, 7);
 });
 
-const runningDeathmatch = (ships) => {
-    const inboxes = ships.map(() => []);
-    const players = ships.map((ship, i) => fakePlayer(i + 1, ship, inboxes[i]));
-    const room = new Room({ id: 'd1', trackId: 'arena', mode: 'deathmatch', track: gentleTrack, config, onClose: () => {} });
-    players.forEach((player) => room.add(player));
-    stepUntil(room, () => room.phase === PHASE.RUNNING);
-    return { room, players, inboxes };
-};
-
-test('a deathmatch holds two pilots and starts them apart with no finish line', () => {
-    const { room, players } = runningDeathmatch(['IMPERATOR', 'BASTION']);
-    assert.equal(room.maxPlayers, config.room.maxPlayers);
-    assert.ok(Math.abs(players[1].sim.distance - players[0].sim.distance) > gentleTrack.length / 4);
-    place(players[0], gentleTrack.length * 5, 0, 100);
-    room.step();
-    assert.equal(players[0].finishTime, null);
-});
-
-test('a destroyed pilot stays down and the enemy wins the deathmatch', () => {
-    const { room, players, inboxes } = runningDeathmatch(['IMPERATOR', 'BASTION']);
-    const [shooter, target] = players;
-    place(shooter, 100, 0, 100);
-    place(target, 130, 0, 100);
-    target.fighter.health = 1;
-    shooter.queueCast('gun', config.combat.castQueueLimit);
-    stepUntil(room, () => inboxes[0].some((message) => message.t === 'results'), 300);
-    const results = inboxes[0].find((message) => message.t === 'results');
-    assert.deepEqual(results.ranking.map((entry) => entry.id), [shooter.id, target.id]);
-});
-
 test('a versus room closes after two pilots', () => {
     const room = new Room({ id: 'v1', trackId: 'chapter6', mode: 'vs', track: gentleTrack, config, onClose: () => {} });
     room.add(fakePlayer(1, 'IMPERATOR'));
     assert.equal(room.isOpen(), true);
     room.add(fakePlayer(2, 'BASTION'));
     assert.equal(room.isOpen(), false);
-});
-
-test('in an eight pilot deathmatch the last survivor wins', () => {
-    const ships = ['IMPERATOR', 'BASTION', 'SERAPH', 'SELENE'];
-    const { room, players, inboxes } = runningDeathmatch(ships);
-    const [shooter, first, second, third] = players;
-    for (const [i, victim] of [first, second, third].entries()) {
-        victim.fighter.health = 1;
-        place(shooter, 100, 0, 100);
-        place(victim, 130, 0, 100);
-        for (const other of players) if (other !== shooter && other !== victim) place(other, 3000 + i * 50, 15, 0);
-        shooter.fighter.cooldowns.gun = 0;
-        shooter.queueCast('gun', config.combat.castQueueLimit);
-        stepUntil(room, () => victim.fighter === null || victim.fighter.defeated, 300);
-        if (i < 2) assert.equal(inboxes[0].some((m) => m.t === 'results'), false);
-    }
-    const results = inboxes[0].find((m) => m.t === 'results');
-    assert.deepEqual(results.ranking.map((e) => e.id), [shooter.id, third.id, second.id, first.id]);
 });

@@ -15,18 +15,18 @@ const SPELLS = Object.freeze({
     gun: {
         cost: 8,
         cooldown: 0.15,
-        projectile: { damage: 6, speed: 500, radius: 1.5, life: 1, homing: 0 },
+        projectile: { damage: 6, speed: 500, radius: 1.5, life: 1, homing: 0, arenaSpeed: 170, arenaTurn: 0 },
     },
     turbo: { cost: 30, cooldown: 1, boost: 1.5 },
     missile: {
         cost: 35,
         cooldown: 1.5,
-        projectile: { damage: 30, speed: 300, radius: 2.5, life: 4, homing: 45 },
+        projectile: { damage: 30, speed: 300, radius: 2.5, life: 4, homing: 45, arenaSpeed: 110, arenaTurn: 2.5 },
     },
     plasma: {
         cost: 50,
         cooldown: 2,
-        projectile: { damage: 40, speed: 400, radius: 5, life: 3, homing: 0 },
+        projectile: { damage: 40, speed: 400, radius: 5, life: 3, homing: 0, arenaSpeed: 140, arenaTurn: 0 },
     },
 });
 
@@ -47,15 +47,26 @@ const TRACKS = Object.freeze({
         width: 36,
         laps: 3,
     },
-    arena: {
-        controlPoints: Array.from({ length: 10 }, (_, i) => [
-            Math.round(Math.cos((i / 10) * 2 * Math.PI) * 120),
-            0,
-            Math.round(Math.sin((i / 10) * 2 * Math.PI) * 120),
-        ]),
-        width: 140,
-        laps: 1000,
+});
+
+const ARENAS = Object.freeze({
+    battle: {
+        halfSize: 130,
+        maxSpeed: 60,
+        spawnCount: 8,
+        spawnRadius: 100,
+        obstacles: [
+            { x: 0, z: 0, radius: 16 },
+            { x: 62, z: 62, radius: 12 },
+            { x: -62, z: 62, radius: 12 },
+            { x: 62, z: -62, radius: 12 },
+            { x: -62, z: -62, radius: 12 },
+            { x: 0, z: 100, radius: 7 },
+            { x: 0, z: -100, radius: 7 },
+            { x: 100, z: 0, radius: 7 },
+            { x: -100, z: 0, radius: 7 },
+        ],
     },
 });
 
-module.exports = { SHIPS, SPELLS, TRACKS };
+module.exports = { SHIPS, SPELLS, TRACKS, ARENAS };
