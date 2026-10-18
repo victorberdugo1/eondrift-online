@@ -14,7 +14,7 @@ module.exports = Object.freeze({
     snapshotRate: 30,
     maxPayloadBytes: 512,
     maxMessagesPerSecond: 200,
-    maxSendBacklogBytes: 64 * 1024,
+    maxSendBacklogBytes: 8 * 1024,
     heartbeatMs: 10000,
     joinTimeoutMs: 10000,
     lobbyTimeoutMs: 120000,
