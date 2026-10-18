@@ -10,15 +10,14 @@ all: up tailscale url ## Build, start the server and publish it on your tailnet
 up: ## Build and start the server in detached mode
 	docker compose up -d --build --wait
 
-tailscale: ## Publish the server over HTTPS/WSS on your tailnet
-	@command -v tailscale >/dev/null || { echo "tailscale CLI not found"; exit 1; }
-	tailscale serve --bg --https=443 http://127.0.0.1:$(PORT)
+tailscale: ## Publish EonDrift through its own Funnel
+	@docker compose exec -T tailscale tailscale funnel --bg --https=443 http://server:$(PORT)
 
-untailscale: ## Stop publishing on your tailnet
-	tailscale serve --https=443 http://127.0.0.1:$(PORT) off
+untailscale: ## Stop EonDrift's public Funnel
+	@docker compose exec -T tailscale tailscale funnel --https=443 off
 
-url: ## Show the tailnet URL (use wss://<host>/ws from clients)
-	@tailscale serve status
+url: ## Show EonDrift's Funnel status
+	@docker compose exec -T tailscale tailscale funnel status
 
 down: ## Stop and remove the container
 	docker compose down

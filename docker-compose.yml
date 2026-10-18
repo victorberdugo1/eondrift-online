@@ -1,3 +1,4 @@
+
 services:
   server:
     build:
@@ -14,3 +15,20 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    hostname: eondrift-online
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  tailscale-state:
