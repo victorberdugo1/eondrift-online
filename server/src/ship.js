@@ -17,6 +17,7 @@ const MAX_BANK = 0.45;
 const WALL_BOUNCE_HEADING = 0.25;
 const BRAKE_GLOW_RATE = 8;
 const REFERENCE_SPEED = 277.5;
+const BOOST_ACCELERATION = 150;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -46,12 +47,16 @@ const createShip = (name, lateral) => ({
     speed: 0,
     roll: 0,
     brakeGlow: 0,
+    boost: 0,
 });
 
 const stepShip = (ship, track, steer, throttle, dt) => {
-    const braking = throttle <= 0 && ship.speed > 0;
+    const boosting = ship.boost > 0;
+    const braking = throttle <= 0 && !boosting && ship.speed > 0;
     ship.brakeGlow = moveToward(ship.brakeGlow, braking ? 1 : 0, BRAKE_GLOW_RATE * dt);
-    ship.speed = Math.max(0, ship.speed + (throttle * ACCELERATION - (1 - throttle) * BRAKING) * dt);
+    ship.boost = Math.max(0, ship.boost - dt);
+    const thrust = throttle * ACCELERATION - (1 - throttle) * BRAKING + (boosting ? BOOST_ACCELERATION : 0);
+    ship.speed = Math.max(0, ship.speed + thrust * dt);
 
     const curvature = track.curvatureAt(ship.distance);
     const authority = clamp(ship.speed / TURN_SPEED_RAMP, 0, 1) * Math.max(1, ship.speed / REFERENCE_SPEED);
@@ -70,4 +75,4 @@ const stepShip = (ship, track, steer, throttle, dt) => {
     ship.roll += (steer * ROLL_AT_FULL_STEER + bank - ship.roll) * (1 - Math.exp(-TILT_RESPONSE * dt));
 };
 
-module.exports = { createShip, stepShip };
+module.exports = { SHIP_RADIUS, createShip, stepShip };

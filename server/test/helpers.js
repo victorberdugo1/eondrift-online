@@ -1,9 +1,11 @@
 'use strict';
 
+const assert = require('node:assert/strict');
 const { WebSocket } = require('ws');
 const config = require('../src/config');
 const { buildTrack } = require('../src/track');
 const { Player } = require('../src/player');
+const { Room } = require('../src/room');
 
 const CIRCLE_POINTS = Array.from({ length: 8 }, (_, i) => [
     Math.cos((i / 8) * 2 * Math.PI) * 40,
@@ -25,6 +27,20 @@ const fakePlayer = (id, ship, inbox = []) => {
     player.shipName = ship;
     player.connection = { socket: { readyState: WebSocket.OPEN, bufferedAmount: 0, send: (text) => inbox.push(JSON.parse(text)) } };
     return player;
+};
+
+const createRace = (config, shipNames) => {
+    const inboxes = shipNames.map(() => []);
+    const players = shipNames.map((ship, i) => fakePlayer(i + 1, ship, inboxes[i]));
+    let closed = false;
+    const room = new Room({ id: 'r1', trackId: 'circle', track: circleTrack, config, onClose: () => (closed = true) });
+    players.forEach((player) => room.add(player));
+    return { room, players, inboxes, isClosed: () => closed };
+};
+
+const stepUntil = (room, condition, maxTicks = 100000) => {
+    for (let i = 0; i < maxTicks && !condition(); i++) room.step();
+    assert.ok(condition(), 'condition not reached');
 };
 
 const connect = (port, headers = {}) =>
@@ -69,4 +85,4 @@ const connect = (port, headers = {}) =>
         socket.once('error', reject);
     });
 
-module.exports = { fastConfig, circleTrack, fakePlayer, connect };
+module.exports = { fastConfig, circleTrack, fakePlayer, createRace, stepUntil, connect };

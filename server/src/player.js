@@ -20,6 +20,8 @@ class Player {
     resetRace() {
         this.input = { seq: 0, ...NEUTRAL_INPUT };
         this.sim = null;
+        this.fighter = null;
+        this.casts = [];
         this.startLateral = 0;
         this.finishTime = null;
     }
@@ -30,6 +32,10 @@ class Player {
 
     applyInput({ seq, steer, throttle }) {
         if (seq > this.input.seq) this.input = { seq, steer, throttle };
+    }
+
+    queueCast(spell, limit) {
+        if (this.casts.length < limit) this.casts.push(spell);
     }
 
     send(message) {

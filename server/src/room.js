@@ -1,6 +1,8 @@
 'use strict';
 
 const { createShip, stepShip } = require('./ship');
+const { createCombat } = require('./combat');
+const { createCollisions } = require('./collisions');
 
 const PHASE = Object.freeze({ LOBBY: 'lobby', COUNTDOWN: 'countdown', RUNNING: 'running' });
 
@@ -8,6 +10,8 @@ const round = (value, digits) => {
     const factor = 10 ** digits;
     return Math.round(value * factor) / factor;
 };
+
+const percent = (value, max) => Math.round((value / max) * 100);
 
 class Room {
     constructor({ id, trackId, track, config, onClose }) {
@@ -24,6 +28,8 @@ class Room {
         this.tick = 0;
         this.raceTick = 0;
         this.firstFinishTick = null;
+        this.combat = createCombat({ config, track });
+        this.collisions = createCollisions({ config, track });
     }
 
     ticks(seconds) {
@@ -71,6 +77,7 @@ class Room {
             player.startLateral = (slot++ - (count - 1) / 2) * gridSpacing;
             player.sim = createShip(player.shipName, player.startLateral);
         }
+        this.combat.start([...this.players.values()]);
         this.phase = PHASE.COUNTDOWN;
         this.phaseTicks = this.ticks(countdownSeconds);
         this.raceTick = 0;
@@ -105,10 +112,14 @@ class Room {
         const racing = this.phase === PHASE.RUNNING;
         const finishDistance = this.track.laps * this.track.length;
 
-        for (const player of this.players.values()) {
+        const players = [...this.players.values()];
+        if (racing) this.combat.step(players);
+
+        for (const player of players) {
             const finished = player.finishTime !== null;
             const steer = finished ? 0 : player.input.steer;
-            const throttle = racing && !finished ? player.input.throttle : 0;
+            const driving = racing && !finished && this.combat.canDrive(player);
+            const throttle = driving ? player.input.throttle : 0;
             const before = player.sim.distance;
             stepShip(player.sim, this.track, steer, throttle, this.dt);
             if (racing && !finished && player.sim.distance >= finishDistance) {
@@ -118,6 +129,7 @@ class Room {
             }
         }
 
+        if (racing) this.collisions.resolve(players.filter((player) => player.finishTime === null).map((player) => player.sim));
         if (racing) this.raceTick++;
         if (this.tick % this.snapshotInterval === 0) this.broadcastState();
         if (racing) this.finishIfOver();
@@ -187,7 +199,7 @@ class Room {
 
     broadcastState() {
         const ships = JSON.stringify(
-            [...this.players.values()].map(({ id, sim, finishTime }) => [
+            [...this.players.values()].map(({ id, sim, finishTime, fighter }) => [
                 id,
                 round(sim.distance, 3),
                 round(sim.lateral, 3),
@@ -196,11 +208,16 @@ class Room {
                 round(sim.roll, 4),
                 round(sim.brakeGlow, 2),
                 finishTime === null ? null : round(finishTime, 3),
+                percent(fighter.health, this.config.combat.maxHealth),
+                percent(fighter.energy, this.config.combat.maxEnergy),
             ]),
+        );
+        const shots = JSON.stringify(
+            this.combat.shots().map(({ id, spell, distance, lateral, speed }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed)]),
         );
         const head = `{"t":"state","tick":${this.raceTick},"ack":`;
         for (const player of this.players.values()) {
-            player.sendRaw(`${head}${player.input.seq},"ships":${ships}}`, true);
+            player.sendRaw(`${head}${player.input.seq},"ships":${ships},"shots":${shots}}`, true);
         }
     }
 }

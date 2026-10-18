@@ -6,8 +6,8 @@ const defaultConfig = require('../src/config');
 const { TRACKS } = require('../src/content');
 const { buildTrack } = require('../src/track');
 const { createShip, stepShip } = require('../src/ship');
-const { Room, PHASE } = require('../src/room');
-const { fakePlayer, circleTrack } = require('./helpers');
+const { PHASE } = require('../src/room');
+const { fakePlayer, createRace, stepUntil } = require('./helpers');
 
 const DT = 1 / 60;
 
@@ -30,20 +30,6 @@ test('ship physics match the native game trajectory', () => {
     assert.ok(Math.abs(ship.lateral - -16) < 1e-6);
     assert.ok(Math.abs(ship.speed - 138.3229) < 0.01);
 });
-
-const createRace = (config, shipNames) => {
-    const inboxes = shipNames.map(() => []);
-    const players = shipNames.map((ship, i) => fakePlayer(i + 1, ship, inboxes[i]));
-    let closed = false;
-    const room = new Room({ id: 'r1', trackId: 'circle', track: circleTrack, config, onClose: () => (closed = true) });
-    players.forEach((player) => room.add(player));
-    return { room, players, inboxes, isClosed: () => closed };
-};
-
-const stepUntil = (room, condition, maxTicks = 100000) => {
-    for (let i = 0; i < maxTicks && !condition(); i++) room.step();
-    assert.ok(condition(), 'condition not reached');
-};
 
 test('a lone player waits in the lobby forever', () => {
     const { room } = createRace(defaultConfig, ['SERAPH']);

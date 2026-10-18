@@ -72,6 +72,10 @@ const createGateway = ({ config, matchmaker }) => {
         input: (connection, message) => {
             if (connection.player?.room) connection.player.applyInput(message);
         },
+        cast: (connection, { spell }) => {
+            const room = connection.player?.room;
+            if (room?.phase === PHASE.RUNNING) connection.player.queueCast(spell, config.combat.castQueueLimit);
+        },
         leave: (connection) => {
             if (connection.player) matchmaker.leave(connection.player);
         },

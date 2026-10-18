@@ -170,3 +170,24 @@ test('behind a trusted proxy the forwarded client IP is what gets capped', async
     b.socket.close();
     await server.close();
 });
+
+test('casts are ignored in the lobby and spend energy once the race runs', async () => {
+    const { server, port } = await startServer();
+    const a = await joinAs(port, 'Ana', 'SERAPH');
+    const b = await joinAs(port, 'Bo', 'SELENE');
+
+    a.client.send({ t: 'cast', spell: 'turbo' });
+    a.client.send({ t: 'cast', spell: 'nuke' });
+    await a.client.waitFor((m) => m.t === 'error' && m.code === 'bad_message');
+    await a.client.waitFor((m) => m.t === 'room' && m.phase === 'running');
+
+    a.client.send({ t: 'cast', spell: 'gun' });
+    const fired = await a.client.waitFor(
+        (m) => m.t === 'state' && m.ships.find((s) => s[0] === a.joined.id)?.[9] < 96 && m.shots.some(([, spell]) => spell === 'gun'),
+    );
+    assert.equal(fired.ships.find((s) => s[0] === a.joined.id)[8], 100);
+
+    await a.client.close();
+    await b.client.close();
+    await server.close();
+});

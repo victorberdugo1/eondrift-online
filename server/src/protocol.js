@@ -1,5 +1,7 @@
 'use strict';
 
+const { SPELLS } = require('./content');
+
 const TOKEN_MAX_LENGTH = 64;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -28,6 +30,10 @@ const parsers = {
             throttle: clamp(message.throttle, 0, 1),
         };
     },
+    cast: (message) =>
+        typeof message.spell === 'string' && Object.hasOwn(SPELLS, message.spell)
+            ? { t: 'cast', spell: message.spell }
+            : null,
     resume: (message) =>
         typeof message.token === 'string' && message.token.length > 0 && message.token.length <= TOKEN_MAX_LENGTH
             ? { t: 'resume', token: message.token }

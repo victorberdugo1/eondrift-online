@@ -19,6 +19,21 @@ module.exports = Object.freeze({
     joinTimeoutMs: 10000,
     resumeGraceMs: 15000,
     nameMaxLength: 16,
+    combat: Object.freeze({
+        maxHealth: 100,
+        maxEnergy: 100,
+        energyPerSecond: 12,
+        disabledSeconds: 2,
+        respawnHealthFraction: 0.5,
+        referenceShield: 5,
+        referenceAttack: 5,
+        shipHalfLength: 3,
+        castQueueLimit: 4,
+    }),
+    collision: Object.freeze({
+        restitution: 0.3,
+        headingKick: 0.08,
+    }),
     room: Object.freeze({
         minPlayers: 2,
         maxPlayers: 8,
