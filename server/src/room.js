@@ -238,7 +238,7 @@ class Room {
             ]),
         );
         const shots = JSON.stringify(
-            this.combat.shots().map(({ id, spell, distance, lateral, speed, heading }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed), round(heading, 3)]),
+            this.combat.shots().map(({ id, spell, distance, lateral, speed, heading, age }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed), round(heading, 3), round(age, 3)]),
         );
         const head = `{"t":"state","tick":${this.raceTick},"ack":`;
         for (const player of this.players.values()) {
