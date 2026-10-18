@@ -41,7 +41,7 @@ const createGateway = ({ config, matchmaker }) => {
 
     const handleJoin = (connection, message) => {
         if (message.ship === null || !Object.hasOwn(SHIPS, message.ship)) return sendError(connection, 'unknown_ship');
-        const trackId = message.track ?? matchmaker.defaultTrackId;
+        const trackId = message.mode === 'deathmatch' ? 'arena' : (message.track ?? matchmaker.defaultTrackId);
         if (!matchmaker.hasTrack(trackId)) return sendError(connection, 'unknown_track');
         if (connection.player?.room) return sendError(connection, 'already_in_room');
 
@@ -54,7 +54,7 @@ const createGateway = ({ config, matchmaker }) => {
         }
         player.name = message.name;
         player.shipName = message.ship;
-        matchmaker.join(player, trackId);
+        matchmaker.join(player, trackId, message.mode);
     };
 
     const handleResume = (connection, message) => {

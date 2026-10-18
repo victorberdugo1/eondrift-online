@@ -7,8 +7,8 @@ const { SPELLS, TRACKS } = require('../src/content');
 const { buildTrack } = require('../src/track');
 const { parse } = require('../src/protocol');
 const { createShip, stepShip } = require('../src/ship');
-const { PHASE } = require('../src/room');
-const { circleTrack, createRace, stepUntil } = require('./helpers');
+const { PHASE, Room } = require('../src/room');
+const { circleTrack, createRace, fakePlayer, stepUntil } = require('./helpers');
 
 const DT = 1 / 60;
 
@@ -237,4 +237,35 @@ test('snapshots carry health, energy and shots', () => {
     assert.equal(state.shots.length, 1);
     assert.equal(state.shots[0][1], 'gun');
     assert.equal(state.shots[0].length, 5);
+});
+
+const runningDeathmatch = (ships) => {
+    const inboxes = ships.map(() => []);
+    const players = ships.map((ship, i) => fakePlayer(i + 1, ship, inboxes[i]));
+    const room = new Room({ id: 'd1', trackId: 'arena', mode: 'deathmatch', track: circleTrack, config, onClose: () => {} });
+    players.forEach((player) => room.add(player));
+    stepUntil(room, () => room.phase === PHASE.RUNNING);
+    return { room, players, inboxes };
+};
+
+test('a deathmatch holds two pilots and starts them apart with no finish line', () => {
+    const { room, players } = runningDeathmatch(['IMPERATOR', 'BASTION']);
+    assert.equal(room.maxPlayers, 2);
+    assert.equal(room.isOpen(), false);
+    assert.ok(Math.abs(players[1].sim.distance - players[0].sim.distance) > circleTrack.length / 4);
+    place(players[0], circleTrack.length * 5, 0, 100);
+    room.step();
+    assert.equal(players[0].finishTime, null);
+});
+
+test('a destroyed pilot stays down and the enemy wins the deathmatch', () => {
+    const { room, players, inboxes } = runningDeathmatch(['IMPERATOR', 'BASTION']);
+    const [shooter, target] = players;
+    place(shooter, 100, 0, 100);
+    place(target, 130, 0, 100);
+    target.fighter.health = 1;
+    shooter.queueCast('gun', config.combat.castQueueLimit);
+    stepUntil(room, () => inboxes[0].some((message) => message.t === 'results'), 300);
+    const results = inboxes[0].find((message) => message.t === 'results');
+    assert.deepEqual(results.ranking.map((entry) => entry.id), [shooter.id, target.id]);
 });

@@ -14,9 +14,10 @@ const createFighter = ({ maxHealth, maxEnergy }) => ({
     energy: maxEnergy,
     cooldowns: {},
     disabledTicks: 0,
+    defeated: false,
 });
 
-const createCombat = ({ config, track }) => {
+const createCombat = ({ config, track, deathmatch = false }) => {
     const { combat } = config;
     const dt = 1 / config.tickRate;
     const ticks = (seconds) => Math.round(seconds * config.tickRate);
@@ -79,9 +80,18 @@ const createCombat = ({ config, track }) => {
         player.sim.boost = 0;
     };
 
+    const defeat = (player) => {
+        player.fighter.health = 0;
+        player.fighter.defeated = true;
+        player.fighter.disabledTicks = Number.MAX_SAFE_INTEGER;
+        player.sim.boost = 0;
+    };
+
     const damage = (player, amount) => {
         player.fighter.health -= (amount * combat.referenceShield) / SHIPS[player.sim.name].shield;
-        if (player.fighter.health <= 0) disable(player);
+        if (player.fighter.health > 0) return;
+        if (deathmatch) defeat(player);
+        else disable(player);
     };
 
     const sweepsThrough = (shot, projectile, before, player) => {

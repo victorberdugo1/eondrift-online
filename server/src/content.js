@@ -47,6 +47,15 @@ const TRACKS = Object.freeze({
         width: 36,
         laps: 3,
     },
+    arena: {
+        controlPoints: Array.from({ length: 10 }, (_, i) => [
+            Math.round(Math.cos((i / 10) * 2 * Math.PI) * 120),
+            0,
+            Math.round(Math.sin((i / 10) * 2 * Math.PI) * 120),
+        ]),
+        width: 140,
+        laps: 1000,
+    },
 });
 
 module.exports = { SHIPS, SPELLS, TRACKS };

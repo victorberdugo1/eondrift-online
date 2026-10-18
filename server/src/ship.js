@@ -39,9 +39,9 @@ const resolveWall = (ship, limit, dt) => {
     ship.speed *= 1 - clamp((WALL_DRAG / SHIPS[ship.name].shield) * dt, 0, 1);
 };
 
-const createShip = (name, lateral) => ({
+const createShip = (name, lateral, distance = 0) => ({
     name,
-    distance: 0,
+    distance,
     lateral,
     heading: 0,
     speed: 0,

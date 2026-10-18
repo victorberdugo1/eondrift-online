@@ -14,9 +14,11 @@ const round = (value, digits) => {
 const percent = (value, max) => Math.round((value / max) * 100);
 
 class Room {
-    constructor({ id, trackId, track, config, onClose }) {
+    constructor({ id, trackId, mode = 'race', track, config, onClose }) {
         this.id = id;
         this.trackId = trackId;
+        this.mode = mode;
+        this.deathmatch = mode === 'deathmatch';
         this.track = track;
         this.config = config;
         this.onClose = onClose;
@@ -28,7 +30,7 @@ class Room {
         this.tick = 0;
         this.raceTick = 0;
         this.firstFinishTick = null;
-        this.combat = createCombat({ config, track });
+        this.combat = createCombat({ config, track, deathmatch: this.deathmatch });
         this.collisions = createCollisions({ config, track });
     }
 
@@ -36,8 +38,12 @@ class Room {
         return Math.round(seconds * this.config.tickRate);
     }
 
+    get maxPlayers() {
+        return this.deathmatch ? this.config.room.deathmatchMaxPlayers : this.config.room.maxPlayers;
+    }
+
     isOpen() {
-        return this.phase === PHASE.LOBBY && this.players.size < this.config.room.maxPlayers;
+        return this.phase === PHASE.LOBBY && this.players.size < this.maxPlayers;
     }
 
     add(player) {
@@ -60,7 +66,8 @@ class Room {
     }
 
     syncLobbyTimer() {
-        const { minPlayers, maxPlayers, lobbyFillSeconds, fullLobbySeconds } = this.config.room;
+        const { minPlayers, lobbyFillSeconds, fullLobbySeconds } = this.config.room;
+        const maxPlayers = this.maxPlayers;
         if (this.players.size < minPlayers) {
             this.phaseTicks = null;
             return;
@@ -74,8 +81,13 @@ class Room {
         const count = this.players.size;
         let slot = 0;
         for (const player of this.players.values()) {
-            player.startLateral = (slot++ - (count - 1) / 2) * gridSpacing;
-            player.sim = createShip(player.shipName, player.startLateral);
+            if (this.deathmatch) {
+                player.startLateral = 0;
+                player.sim = createShip(player.shipName, 0, (slot++ * this.track.length) / count);
+            } else {
+                player.startLateral = (slot++ - (count - 1) / 2) * gridSpacing;
+                player.sim = createShip(player.shipName, player.startLateral);
+            }
         }
         this.combat.start([...this.players.values()]);
         this.phase = PHASE.COUNTDOWN;
@@ -122,7 +134,7 @@ class Room {
             const throttle = driving ? player.input.throttle : 0;
             const before = player.sim.distance;
             stepShip(player.sim, this.track, steer, throttle, this.dt);
-            if (racing && !finished && player.sim.distance >= finishDistance) {
+            if (racing && !finished && !this.deathmatch && player.sim.distance >= finishDistance) {
                 const crossed = (finishDistance - before) / (player.sim.distance - before);
                 player.finishTime = (this.raceTick + crossed) * this.dt;
                 this.firstFinishTick ??= this.raceTick + 1;
@@ -136,13 +148,25 @@ class Room {
     }
 
     finishIfOver() {
+        if (this.deathmatch) return this.finishDeathmatchIfOver();
         const { finishGraceSeconds, raceTimeoutSeconds } = this.config.room;
         const everyoneFinished = [...this.players.values()].every((player) => player.finishTime !== null);
         const graceOver = this.firstFinishTick !== null && this.raceTick - this.firstFinishTick >= this.ticks(finishGraceSeconds);
         if (everyoneFinished || graceOver || this.raceTick >= this.ticks(raceTimeoutSeconds)) this.finish();
     }
 
+    finishDeathmatchIfOver() {
+        const alive = [...this.players.values()].filter((player) => !player.fighter.defeated);
+        if (alive.length <= 1 || this.raceTick >= this.ticks(this.config.room.deathmatchTimeoutSeconds)) this.finish();
+    }
+
+    deathmatchRanking() {
+        const standing = (player) => (player.fighter.defeated ? -1 : player.fighter.health);
+        return [...this.players.values()].sort((a, b) => standing(b) - standing(a)).map((player) => ({ id: player.id, time: null }));
+    }
+
     ranking() {
+        if (this.deathmatch) return this.deathmatchRanking();
         const players = [...this.players.values()];
         const finished = players.filter((player) => player.finishTime !== null).sort((a, b) => a.finishTime - b.finishTime);
         const unfinished = players.filter((player) => player.finishTime === null).sort((a, b) => b.sim.distance - a.sim.distance);
@@ -172,6 +196,7 @@ class Room {
             t: 'room',
             id: this.id,
             track: this.trackId,
+            mode: this.mode,
             laps: this.track.laps,
             phase: this.phase,
             endsIn: this.phaseTicks === null ? null : Math.round((this.phaseTicks / this.config.tickRate) * 1000),
