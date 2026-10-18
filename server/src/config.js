@@ -11,7 +11,7 @@ module.exports = Object.freeze({
     maxConnectionsPerIp: numberFromEnv('MAX_CONNECTIONS_PER_IP', 20),
     trustProxy: process.env.TRUST_PROXY === '1',
     tickRate: 60,
-    snapshotRate: 20,
+    snapshotRate: 30,
     maxPayloadBytes: 512,
     maxMessagesPerSecond: 200,
     maxSendBacklogBytes: 64 * 1024,

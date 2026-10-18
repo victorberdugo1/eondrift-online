@@ -30,18 +30,21 @@ const createCombat = ({ config, track }) => {
 
     const fire = (shooter, spell, projectile, players) => {
         const { sim } = shooter;
-        shots.push({
-            id: nextShotId++,
-            spell,
-            owner: shooter.id,
-            damage: outgoingDamage(combat, sim.name, projectile),
-            distance: sim.distance,
-            lateral: sim.lateral,
-            speed: sim.speed + projectile.speed,
-            heading: projectile.homing > 0 ? 0 : sim.heading,
-            age: 0,
-            target: projectile.homing > 0 ? (nearestAhead(shooter, players)?.id ?? null) : null,
-        });
+        const target = projectile.homing > 0 ? (nearestAhead(shooter, players)?.id ?? null) : null;
+        for (const offset of projectile.barrels) {
+            shots.push({
+                id: nextShotId++,
+                spell,
+                owner: shooter.id,
+                damage: outgoingDamage(combat, sim.name, projectile) * projectile.barrelDamageScale,
+                distance: sim.distance,
+                lateral: sim.lateral + offset,
+                speed: sim.speed + projectile.speed,
+                heading: projectile.homing > 0 ? 0 : sim.heading,
+                age: 0,
+                target,
+            });
+        }
     };
 
     const cast = (shooter, spell, players) => {

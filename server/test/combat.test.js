@@ -88,9 +88,27 @@ test('a gun shot damages the ship ahead, scaled by attack and shield', () => {
     place(target, 130, 0, 100);
     shooter.queueCast('gun', config.combat.castQueueLimit);
     stepUntil(room, () => target.fighter.health < config.combat.maxHealth, 120);
-    const expected = SPELLS.gun.projectile.damage * (8 / config.combat.referenceAttack) * (config.combat.referenceShield / 8);
+    const { damage, barrels, barrelDamageScale } = SPELLS.gun.projectile;
+    const expected = damage * barrelDamageScale * barrels.length * (8 / config.combat.referenceAttack) * (config.combat.referenceShield / 8);
     assert.ok(Math.abs(config.combat.maxHealth - target.fighter.health - expected) < 1e-6);
     assert.equal(room.combat.shots().length, 0);
+});
+
+test('a gun cast fires two bolts from either side of the ship for a single energy cost', () => {
+    const { room, players } = runningRace(['SERAPH', 'SELENE']);
+    const [shooter] = players;
+    place(shooter, 100, 5, 100);
+    place(players[1], 400, 0, 100);
+    shooter.queueCast('gun', config.combat.castQueueLimit);
+    room.step();
+    const bolts = room.combat.shots();
+    const [left, right] = SPELLS.gun.projectile.barrels;
+    assert.equal(bolts.length, 2);
+    assert.ok(Math.abs(bolts[1].lateral - bolts[0].lateral - (right - left)) < 1e-9);
+    assert.ok(Math.abs((bolts[0].lateral + bolts[1].lateral) / 2 - 5) < 0.2);
+    assert.equal(bolts[0].speed, bolts[1].speed);
+    assert.ok(bolts[0].speed >= SPELLS.gun.projectile.speed);
+    assert.ok(shooter.fighter.energy > config.combat.maxEnergy - 2 * SPELLS.gun.cost);
 });
 
 test('a shot never hits its owner or a ship behind it', () => {
@@ -244,7 +262,7 @@ test('snapshots carry health, energy and shots', () => {
     assert.equal(ship.length, 10);
     assert.equal(ship[8], 100);
     assert.equal(ship[9], Math.round(((config.combat.maxEnergy - SPELLS.gun.cost + (5 * config.combat.energyPerSecond) / config.tickRate) / config.combat.maxEnergy) * 100));
-    assert.equal(state.shots.length, 1);
+    assert.equal(state.shots.length, 2);
     assert.equal(state.shots[0][1], 'gun');
     assert.equal(state.shots[0].length, 7);
 });

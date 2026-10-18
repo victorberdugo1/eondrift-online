@@ -42,18 +42,21 @@ const createArenaCombat = ({ config, arena }) => {
 
     const fire = (shooter, spell, projectile, players) => {
         const { sim } = shooter;
-        shots.push({
-            id: nextShotId++,
-            spell,
-            owner: shooter.id,
-            damage: outgoingDamage(combat, sim.name, projectile),
-            x: sim.x,
-            z: sim.z,
-            speed: sim.speed + projectile.arenaSpeed,
-            heading: sim.heading,
-            age: 0,
-            target: projectile.homing > 0 ? (nearestInCone(shooter, players)?.id ?? null) : null,
-        });
+        const target = projectile.homing > 0 ? (nearestInCone(shooter, players)?.id ?? null) : null;
+        for (const offset of projectile.barrels) {
+            shots.push({
+                id: nextShotId++,
+                spell,
+                owner: shooter.id,
+                damage: outgoingDamage(combat, sim.name, projectile) * projectile.barrelDamageScale,
+                x: sim.x + Math.cos(sim.heading) * offset,
+                z: sim.z + Math.sin(sim.heading) * offset,
+                speed: sim.speed + projectile.arenaSpeed,
+                heading: sim.heading,
+                age: 0,
+                target,
+            });
+        }
     };
 
     const cast = (shooter, spell, players) => {

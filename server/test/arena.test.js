@@ -131,9 +131,25 @@ test('a gun shot flies straight across the plane and damages the ship it meets',
     place(target, 0, -40);
     shooter.queueCast('gun', config.combat.castQueueLimit);
     for (let i = 0; i < 30; i++) room.step();
-    const expected = SPELLS.gun.projectile.damage * (8 / config.combat.referenceAttack) * (config.combat.referenceShield / 8);
+    const { damage, barrels, barrelDamageScale } = SPELLS.gun.projectile;
+    const expected = damage * barrelDamageScale * barrels.length * (8 / config.combat.referenceAttack) * (config.combat.referenceShield / 8);
     assert.ok(Math.abs(config.combat.maxHealth - target.fighter.health - expected) < 1e-6);
     assert.equal(room.combat.shots().length, 0);
+});
+
+test('a gun cast fires two bolts either side of the heading at the same speed as in a race', () => {
+    const { room, players } = runningArena(['IMPERATOR', 'BASTION']);
+    const [shooter] = players;
+    place(shooter, 10, 20, 0.5);
+    place(players[1], -90, -90);
+    shooter.queueCast('gun', config.combat.castQueueLimit);
+    room.step();
+    const bolts = room.combat.shots();
+    const [left, right] = SPELLS.gun.projectile.barrels;
+    assert.equal(bolts.length, 2);
+    assert.ok(Math.abs(bolts[1].x - bolts[0].x - Math.cos(0.5) * (right - left)) < 1e-9);
+    assert.ok(Math.abs(bolts[1].z - bolts[0].z - Math.sin(0.5) * (right - left)) < 1e-9);
+    assert.ok(bolts.every((bolt) => bolt.speed === shooter.sim.speed + SPELLS.gun.projectile.speed));
 });
 
 test('a shot never hits its owner or a ship behind it', () => {
@@ -260,7 +276,7 @@ test('snapshots carry plane positions for ships and shots', () => {
     assert.equal(row.length, 10);
     assert.ok(Math.abs(row[1] - 12.5) < 0.01 && Math.abs(row[2] - 3) < 0.01);
     assert.equal(row[8], 100);
-    assert.equal(state.shots.length, 1);
+    assert.equal(state.shots.length, 2);
     assert.equal(state.shots[0].length, 7);
     assert.equal(state.shots[0][1], 'gun');
 });
