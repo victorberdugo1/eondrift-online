@@ -225,7 +225,7 @@ test('the first pilot picks the stage and later pilots join that stage without c
     const { server, port } = await startServer();
     const scout = await connect(port);
     scout.send({ t: 'lobby', mode: 'race' });
-    assert.deepEqual(await scout.waitFor((m) => m.t === 'lobby'), { t: 'lobby', room: null, track: null });
+    assert.deepEqual(await scout.waitFor((m) => m.t === 'lobby'), { t: 'lobby', role: 'host', room: null, track: null });
 
     const a = await hostAs(port, 'Ana', 'SERAPH');
     const b = await guestAs(port, 'Bo', 'SELENE');
@@ -273,5 +273,52 @@ test('every stage the client offers can be hosted for races and for deathmatch',
     await client.close();
     await race.client.close();
     await arena.client.close();
+    await server.close();
+});
+
+test('while the first pilot is still choosing the stage the next pilot waits instead of hosting', async () => {
+    const { server, port } = await startServer();
+    const first = await connect(port);
+    first.send({ t: 'lobby', mode: 'race' });
+    assert.equal((await first.waitFor((m) => m.t === 'lobby')).role, 'host');
+
+    const second = await connect(port);
+    second.send({ t: 'lobby', mode: 'race' });
+    const waiting = await second.waitFor((m) => m.t === 'lobby');
+    assert.deepEqual(waiting, { t: 'lobby', role: 'wait', room: null, track: null });
+
+    const other = await connect(port);
+    other.send({ t: 'lobby', mode: 'vs' });
+    assert.equal((await other.waitFor((m) => m.t === 'lobby')).role, 'host');
+
+    first.send({ t: 'join', name: 'Ana', ship: 'SERAPH', track: 'circle' });
+    await first.waitFor((m) => m.t === 'joined');
+    second.inbox.length = 0;
+    second.send({ t: 'lobby', mode: 'race' });
+    assert.deepEqual(await second.waitFor((m) => m.t === 'lobby'), { t: 'lobby', role: 'guest', room: 'r1', track: 'circle' });
+    second.send({ t: 'join', name: 'Bo', ship: 'SELENE', room: 'r1' });
+    await second.waitFor((m) => m.t === 'room' && m.players.length === 2);
+
+    await first.close();
+    await second.close();
+    await other.close();
+    await server.close();
+});
+
+test('a pilot who leaves before choosing the stage hands the host spot to the one waiting', async () => {
+    const { server, port } = await startServer();
+    const first = await connect(port);
+    first.send({ t: 'lobby', mode: 'race' });
+    await first.waitFor((m) => m.t === 'lobby');
+    const second = await connect(port);
+    second.send({ t: 'lobby', mode: 'race' });
+    assert.equal((await second.waitFor((m) => m.t === 'lobby')).role, 'wait');
+
+    await first.close();
+    second.inbox.length = 0;
+    second.send({ t: 'lobby', mode: 'race' });
+    assert.equal((await second.waitFor((m) => m.t === 'lobby')).role, 'host');
+
+    await second.close();
     await server.close();
 });

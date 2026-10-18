@@ -39,9 +39,18 @@ const createGateway = ({ config, matchmaker }) => {
         player.send({ t: 'joined', id: player.id, token: player.token, resumed });
     };
 
+    const armJoinTimer = (connection, delayMs) => {
+        clearTimeout(connection.joinTimer);
+        connection.joinTimer = setTimeout(() => {
+            if (!connection.player) connection.socket.close(CLOSE_POLICY_VIOLATION);
+        }, delayMs);
+    };
+
     const handleLobby = (connection, { mode }) => {
-        const room = matchmaker.openRoom(mode);
-        connection.socket.send(JSON.stringify({ t: 'lobby', room: room?.id ?? null, track: room?.trackId ?? null }));
+        if (connection.player) return sendError(connection, 'already_in_room');
+        armJoinTimer(connection, config.lobbyTimeoutMs);
+        const { role, room } = matchmaker.claim(connection, mode);
+        connection.socket.send(JSON.stringify({ t: 'lobby', role, room: room?.id ?? null, track: room?.trackId ?? null }));
     };
 
     const handleJoin = (connection, message) => {
@@ -51,6 +60,7 @@ const createGateway = ({ config, matchmaker }) => {
         if (hosting && !matchmaker.hasStage(message.track, message.mode)) return sendError(connection, 'unknown_track');
         if (!hosting && !matchmaker.canJoin(message.room, message.mode)) return sendError(connection, 'room_unavailable');
 
+        matchmaker.release(connection);
         let player = connection.player;
         if (!player) {
             player = new Player(nextPlayerId++, randomBytes(16).toString('hex'), config.maxSendBacklogBytes);
@@ -107,6 +117,7 @@ const createGateway = ({ config, matchmaker }) => {
 
     const onClose = (connection) => {
         clearTimeout(connection.joinTimer);
+        matchmaker.release(connection);
         connections.delete(connection);
         const player = connection.player;
         if (!player) return;
@@ -126,10 +137,9 @@ const createGateway = ({ config, matchmaker }) => {
             alive: true,
             windowStart: Date.now(),
             windowCount: 0,
-            joinTimer: setTimeout(() => {
-                if (!connection.player) socket.close(CLOSE_POLICY_VIOLATION);
-            }, config.joinTimeoutMs),
+            joinTimer: null,
         };
+        armJoinTimer(connection, config.joinTimeoutMs);
         connections.add(connection);
         socket.on('pong', () => {
             connection.alive = true;

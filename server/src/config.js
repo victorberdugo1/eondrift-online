@@ -17,6 +17,7 @@ module.exports = Object.freeze({
     maxSendBacklogBytes: 64 * 1024,
     heartbeatMs: 10000,
     joinTimeoutMs: 10000,
+    lobbyTimeoutMs: 120000,
     resumeGraceMs: 15000,
     nameMaxLength: 16,
     combat: Object.freeze({

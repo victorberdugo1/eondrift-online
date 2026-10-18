@@ -5,6 +5,7 @@ const { ArenaRoom } = require('./arena_room');
 
 const createMatchmaker = ({ config, tracks, arenas }) => {
     const rooms = new Map();
+    const claims = new Map();
     let nextRoomId = 1;
 
     const stagesFor = (mode) => (mode === 'deathmatch' ? arenas : tracks);
@@ -23,7 +24,18 @@ const createMatchmaker = ({ config, tracks, arenas }) => {
 
     return {
         hasStage: (trackId, mode) => Object.hasOwn(stagesFor(mode), trackId),
-        openRoom,
+        claim: (owner, mode) => {
+            const room = openRoom(mode);
+            if (room) {
+                claims.delete(owner);
+                return { role: 'guest', room };
+            }
+            const holder = [...claims].find(([, claimedMode]) => claimedMode === mode);
+            if (holder && holder[0] !== owner) return { role: 'wait', room: null };
+            claims.set(owner, mode);
+            return { role: 'host', room: null };
+        },
+        release: (owner) => claims.delete(owner),
         canJoin: (roomId, mode) => {
             const room = rooms.get(roomId);
             return room !== undefined && room.mode === mode && room.isOpen();
