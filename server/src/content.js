@@ -15,18 +15,18 @@ const SPELLS = Object.freeze({
     gun: {
         cost: 8,
         cooldown: 0.15,
-        projectile: { damage: 6, speed: 500, radius: 1.5, life: 1, homing: 0, arenaSpeed: 170, arenaTurn: 0 },
+        projectile: { damage: 6, slow: 0.06, speed: 500, radius: 1.5, life: 1, homing: 0, arenaSpeed: 170, arenaTurn: 0 },
     },
     turbo: { cost: 30, cooldown: 1, boost: 1.5 },
     missile: {
         cost: 35,
         cooldown: 1.5,
-        projectile: { damage: 30, speed: 300, radius: 2.5, life: 4, homing: 45, arenaSpeed: 110, arenaTurn: 2.5 },
+        projectile: { damage: 30, slow: 0.3, speed: 300, radius: 2.5, life: 4, homing: 45, arenaSpeed: 110, arenaTurn: 2.5 },
     },
     plasma: {
         cost: 50,
         cooldown: 2,
-        projectile: { damage: 40, speed: 400, radius: 5, life: 3, homing: 0, arenaSpeed: 140, arenaTurn: 0 },
+        projectile: { damage: 40, slow: 0.5, speed: 400, radius: 5, life: 3, homing: 0, arenaSpeed: 140, arenaTurn: 0 },
     },
 });
 

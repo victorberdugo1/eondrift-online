@@ -47,7 +47,6 @@ const createCombat = ({ config, track }) => {
     const cast = (shooter, spell, players) => {
         const projectile = castSpell(shooter, spell, ticks);
         if (projectile) fire(shooter, spell, projectile, players);
-        if (shooter.fighter.energy <= 0) defeat(shooter, ++defeats);
     };
 
     const disable = (player) => {
@@ -57,9 +56,13 @@ const createCombat = ({ config, track }) => {
         player.sim.boost = 0;
     };
 
-    const damage = (player, amount) => {
-        player.fighter.health -= incomingDamage(combat, player.sim.name, amount);
-        if (player.fighter.health <= 0) disable(player);
+    const damage = (player, amount, slow) => {
+        const taken = incomingDamage(combat, player.sim.name, amount);
+        player.fighter.health -= taken;
+        player.fighter.energy -= taken;
+        player.sim.speed *= 1 - slow;
+        if (player.fighter.energy <= 0) defeat(player, ++defeats);
+        else if (player.fighter.health <= 0) disable(player);
     };
 
     const sweepsThrough = (shot, projectile, before, player) => {
@@ -86,7 +89,7 @@ const createCombat = ({ config, track }) => {
         if (target) shot.lateral = moveToward(shot.lateral, target.sim.lateral, projectile.homing * dt);
 
         const victim = players.find((player) => player.id !== shot.owner && isActive(player) && sweepsThrough(shot, projectile, before, player));
-        if (victim) damage(victim, shot.damage);
+        if (victim) damage(victim, shot.damage, projectile.slow);
         return !victim && shot.age < projectile.life;
     };
 

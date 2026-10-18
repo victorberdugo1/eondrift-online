@@ -59,12 +59,14 @@ const createArenaCombat = ({ config, arena }) => {
     const cast = (shooter, spell, players) => {
         const projectile = castSpell(shooter, spell, ticks);
         if (projectile) fire(shooter, spell, projectile, players);
-        if (shooter.fighter.energy <= 0) defeat(shooter, ++defeats);
     };
 
-    const damage = (player, amount) => {
-        player.fighter.health -= incomingDamage(combat, player.sim.name, amount);
-        if (player.fighter.health <= 0) defeat(player, ++defeats);
+    const damage = (player, amount, slow) => {
+        const taken = incomingDamage(combat, player.sim.name, amount);
+        player.fighter.health -= taken;
+        player.fighter.energy -= taken;
+        player.sim.speed *= 1 - slow;
+        if (player.fighter.health <= 0 || player.fighter.energy <= 0) defeat(player, ++defeats);
     };
 
     const isBlocked = (shot) =>
@@ -95,7 +97,7 @@ const createArenaCombat = ({ config, arena }) => {
                 isActive(player) &&
                 distanceToSegment(player.sim.x, player.sim.z, fromX, fromZ, shot.x, shot.z) <= reach,
         );
-        if (victim) damage(victim, shot.damage);
+        if (victim) damage(victim, shot.damage, projectile.slow);
         return !victim && shot.age < projectile.life;
     };
 

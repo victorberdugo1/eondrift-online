@@ -32,9 +32,9 @@ const defeat = (player, order) => {
 const castSpell = (player, spell, ticks) => {
     const spec = SPELLS[spell];
     const { fighter, sim } = player;
-    if (!isActive(player) || fighter.energy <= 0 || (fighter.cooldowns[spell] ?? 0) > 0) return null;
+    if (!isActive(player) || fighter.energy < spec.cost || (fighter.cooldowns[spell] ?? 0) > 0) return null;
 
-    fighter.energy = Math.max(0, fighter.energy - spec.cost);
+    fighter.energy -= spec.cost;
     fighter.cooldowns[spell] = ticks(spec.cooldown);
     if (!spec.projectile) {
         sim.boost = Math.max(sim.boost, spec.boost);
