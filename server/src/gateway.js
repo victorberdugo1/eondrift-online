@@ -50,17 +50,19 @@ const createGateway = ({ config, matchmaker }) => {
         if (connection.player) return sendError(connection, 'already_in_room');
         armJoinTimer(connection, config.lobbyTimeoutMs);
         const { role, room } = matchmaker.claim(connection, mode);
-        connection.socket.send(JSON.stringify({ t: 'lobby', role, room: room?.id ?? null, track: room?.trackId ?? null }));
+        connection.socket.send(JSON.stringify({ t: 'lobby', role, room: room.id, track: room.trackId }));
+    };
+
+    const handleStage = (connection, { track }) => {
+        const code = matchmaker.setStage(connection, track);
+        if (code) sendError(connection, code);
     };
 
     const handleJoin = (connection, message) => {
         if (message.ship === null || !Object.hasOwn(SHIPS, message.ship)) return sendError(connection, 'unknown_ship');
         if (connection.player?.room) return sendError(connection, 'already_in_room');
-        const hosting = message.track !== null;
-        if (hosting && !matchmaker.hasStage(message.track, message.mode)) return sendError(connection, 'unknown_track');
-        if (!hosting && !matchmaker.canJoin(message.room, message.mode)) return sendError(connection, 'room_unavailable');
+        if (!matchmaker.canJoin(connection, message.room, message.mode)) return sendError(connection, 'room_unavailable');
 
-        matchmaker.release(connection);
         let player = connection.player;
         if (!player) {
             player = new Player(nextPlayerId++, randomBytes(16).toString('hex'), config.maxSendBacklogBytes);
@@ -70,8 +72,7 @@ const createGateway = ({ config, matchmaker }) => {
         }
         player.name = message.name;
         player.shipName = message.ship;
-        if (hosting) matchmaker.host(player, message.track, message.mode);
-        else matchmaker.join(player, message.room);
+        matchmaker.join(player, message.room);
     };
 
     const handleResume = (connection, message) => {
@@ -85,6 +86,7 @@ const createGateway = ({ config, matchmaker }) => {
     const handlers = {
         ping: (connection, { ts }) => connection.socket.send(JSON.stringify({ t: 'pong', ts })),
         lobby: handleLobby,
+        stage: handleStage,
         join: handleJoin,
         resume: handleResume,
         input: (connection, message) => {

@@ -14,10 +14,11 @@ const round = (value, digits) => {
 const percent = (value, max) => Math.round((value / max) * 100);
 
 class Room {
-    constructor({ id, trackId, mode = 'race', track, arena, config, onClose }) {
+    constructor({ id, trackId = null, mode = 'race', owner = null, track, arena, config, onClose }) {
         this.id = id;
         this.trackId = trackId;
         this.mode = mode;
+        this.owner = owner;
         this.track = track;
         this.arena = arena;
         this.config = config;
@@ -25,13 +26,23 @@ class Room {
         this.dt = 1 / config.tickRate;
         this.snapshotInterval = Math.round(config.tickRate / config.snapshotRate);
         this.players = new Map();
+        this.reserved = new Set();
+        this.closed = false;
         this.phase = PHASE.LOBBY;
         this.phaseTicks = null;
         this.tick = 0;
         this.raceTick = 0;
         this.firstFinishTick = null;
+        if (trackId !== null) this.prepare();
+    }
+
+    prepare() {
         this.combat = this.createCombat();
         this.collisions = this.createCollisions();
+    }
+
+    applyLayout(track) {
+        this.track = track;
     }
 
     createCombat() {
@@ -43,7 +54,7 @@ class Room {
     }
 
     get laps() {
-        return this.track.laps;
+        return this.track?.laps ?? 0;
     }
 
     ticks(seconds) {
@@ -54,13 +65,63 @@ class Room {
         return this.mode === 'vs' ? this.config.room.versusMaxPlayers : this.config.room.maxPlayers;
     }
 
+    get seats() {
+        return this.players.size + this.reserved.size;
+    }
+
     isOpen() {
-        return this.phase === PHASE.LOBBY && this.players.size < this.maxPlayers;
+        return this.phase === PHASE.LOBBY && this.seats < this.maxPlayers;
+    }
+
+    hasSeatFor(connection) {
+        return this.phase === PHASE.LOBBY && (this.reserved.has(connection) || this.seats < this.maxPlayers);
+    }
+
+    hasOwner() {
+        return this.reserved.has(this.owner) || this.owner?.player?.room === this;
+    }
+
+    canSetStage(connection) {
+        return this.phase === PHASE.LOBBY && this.trackId === null && this.owner === connection;
+    }
+
+    setStage(trackId, layout) {
+        this.trackId = trackId;
+        this.applyLayout(layout);
+        this.prepare();
+        this.syncLobbyTimer();
+        this.broadcastRoom();
+    }
+
+    reserve(connection) {
+        this.reserved.add(connection);
+    }
+
+    unreserve(connection) {
+        this.reserved.delete(connection);
+        this.settle();
+    }
+
+    settle() {
+        if (this.closed) return;
+        if (this.trackId === null && !this.hasOwner()) return this.dissolve();
+        if (this.seats === 0) this.close();
+    }
+
+    dissolve() {
+        this.broadcast({ t: 'error', code: 'host_left' });
+        for (const player of this.players.values()) {
+            player.room = null;
+            player.resetRace();
+        }
+        this.players.clear();
+        this.close();
     }
 
     add(player) {
         player.resetRace();
         player.room = this;
+        this.reserved.delete(player.connection);
         this.players.set(player.id, player);
         this.syncLobbyTimer();
         this.broadcastRoom();
@@ -70,7 +131,8 @@ class Room {
         if (!this.players.delete(player.id)) return;
         player.room = null;
         player.resetRace();
-        if (this.players.size === 0) return this.close();
+        this.settle();
+        if (this.closed) return;
         if (this.phase === PHASE.LOBBY) this.syncLobbyTimer();
         if (this.phase === PHASE.COUNTDOWN && this.players.size < this.config.room.minPlayers) this.abortCountdown();
         this.broadcastRoom();
@@ -80,7 +142,7 @@ class Room {
     syncLobbyTimer() {
         const { minPlayers, lobbyFillSeconds, fullLobbySeconds } = this.config.room;
         const maxPlayers = this.maxPlayers;
-        if (this.players.size < minPlayers) {
+        if (this.trackId === null || this.players.size < minPlayers) {
             this.phaseTicks = null;
             return;
         }
@@ -98,6 +160,7 @@ class Room {
 
     startCountdown() {
         const players = [...this.players.values()];
+        this.reserved.clear();
         this.spawn(players);
         this.combat.start(players);
         this.phase = PHASE.COUNTDOWN;
@@ -189,6 +252,8 @@ class Room {
     }
 
     close() {
+        if (this.closed) return;
+        this.closed = true;
         this.onClose(this);
     }
 
@@ -198,7 +263,7 @@ class Room {
             t: 'room',
             id: this.id,
             track: this.trackId,
-            host: this.players.keys().next().value ?? null,
+            host: this.owner?.player?.room === this ? this.owner.player.id : null,
             mode: this.mode,
             laps: this.laps,
             phase: this.phase,

@@ -277,8 +277,10 @@ test('the matchmaker routes deathmatch players into an arena room', () => {
     const matchmaker = createMatchmaker({ config, tracks: {}, arenas: { enuma_ichor: battle } });
     const first = fakePlayer(1, 'SERAPH');
     const second = fakePlayer(2, 'SELENE');
-    matchmaker.host(first, 'enuma_ichor', 'deathmatch');
-    matchmaker.join(second, first.room.id);
+    const { room } = matchmaker.claim(first.connection, 'deathmatch');
+    assert.equal(matchmaker.setStage(first.connection, 'enuma_ichor'), null);
+    matchmaker.join(first, room.id);
+    matchmaker.join(second, room.id);
     assert.ok(first.room instanceof ArenaRoom);
     assert.equal(first.room, second.room);
     assert.equal(matchmaker.roomCount(), 1);

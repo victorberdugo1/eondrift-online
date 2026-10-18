@@ -18,17 +18,19 @@ const parseMode = (value) => (value === 'deathmatch' || value === 'vs' ? value :
 const parsers = {
     lobby: (message) => ({ t: 'lobby', mode: parseMode(message.mode) }),
     join: (message, { nameMaxLength }) => {
-        const track = optionalString(message.track);
         const room = optionalString(message.room);
-        if ((track === null) === (room === null)) return null;
+        if (room === null) return null;
         return {
             t: 'join',
             name: sanitizeName(message.name, nameMaxLength),
             ship: optionalString(message.ship),
-            track,
             room,
             mode: parseMode(message.mode),
         };
+    },
+    stage: (message) => {
+        const track = optionalString(message.track);
+        return track === null ? null : { t: 'stage', track };
     },
     input: (message) => {
         if (!Number.isSafeInteger(message.seq) || message.seq < 0) return null;

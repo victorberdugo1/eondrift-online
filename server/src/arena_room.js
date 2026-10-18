@@ -6,6 +6,10 @@ const { createArenaCombat } = require('./arena_combat');
 const { createArenaCollisions } = require('./arena_collisions');
 
 class ArenaRoom extends Room {
+    applyLayout(arena) {
+        this.arena = arena;
+    }
+
     createCombat() {
         return createArenaCombat({ config: this.config, arena: this.arena });
     }
