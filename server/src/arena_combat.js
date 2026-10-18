@@ -3,7 +3,7 @@
 const { SPELLS } = require('./content');
 const { SHIP_RADIUS } = require('./ship');
 const { clamp, wrapAngle } = require('./math');
-const { createFighter, tickFighter, isActive, castSpell, outgoingDamage, incomingDamage } = require('./fighter');
+const { createFighter, tickFighter, isActive, defeat, castSpell, outgoingDamage, incomingDamage } = require('./fighter');
 
 const HOMING_CONE = Math.PI / 3;
 
@@ -59,19 +59,12 @@ const createArenaCombat = ({ config, arena }) => {
     const cast = (shooter, spell, players) => {
         const projectile = castSpell(shooter, spell, ticks);
         if (projectile) fire(shooter, spell, projectile, players);
-    };
-
-    const defeat = (player) => {
-        player.fighter.health = 0;
-        player.fighter.defeated = true;
-        player.fighter.defeatOrder = ++defeats;
-        player.fighter.disabledTicks = Number.MAX_SAFE_INTEGER;
-        player.sim.boost = 0;
+        if (shooter.fighter.energy <= 0) defeat(shooter, ++defeats);
     };
 
     const damage = (player, amount) => {
         player.fighter.health -= incomingDamage(combat, player.sim.name, amount);
-        if (player.fighter.health <= 0) defeat(player);
+        if (player.fighter.health <= 0) defeat(player, ++defeats);
     };
 
     const isBlocked = (shot) =>

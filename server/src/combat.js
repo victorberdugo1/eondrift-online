@@ -4,7 +4,7 @@ const { SPELLS } = require('./content');
 const { wrapDelta } = require('./collisions');
 const { SHIP_RADIUS } = require('./ship');
 const { moveToward } = require('./math');
-const { createFighter, tickFighter, isActive, castSpell, outgoingDamage, incomingDamage } = require('./fighter');
+const { createFighter, tickFighter, isActive, defeat, castSpell, outgoingDamage, incomingDamage } = require('./fighter');
 
 const createCombat = ({ config, track }) => {
     const { combat } = config;
@@ -12,6 +12,7 @@ const createCombat = ({ config, track }) => {
     const ticks = (seconds) => Math.round(seconds * config.tickRate);
     let shots = [];
     let nextShotId = 1;
+    let defeats = 0;
 
     const nearestAhead = (shooter, players) => {
         let best = null;
@@ -46,6 +47,7 @@ const createCombat = ({ config, track }) => {
     const cast = (shooter, spell, players) => {
         const projectile = castSpell(shooter, spell, ticks);
         if (projectile) fire(shooter, spell, projectile, players);
+        if (shooter.fighter.energy <= 0) defeat(shooter, ++defeats);
     };
 
     const disable = (player) => {
@@ -91,6 +93,7 @@ const createCombat = ({ config, track }) => {
     return {
         start: (players) => {
             shots = [];
+            defeats = 0;
             for (const player of players) player.fighter = createFighter(combat);
         },
         step: (players) => {

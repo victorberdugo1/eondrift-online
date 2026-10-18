@@ -151,7 +151,7 @@ class Room {
             }
         }
 
-        if (racing) this.collisions.resolve(players.filter((player) => player.finishTime === null).map((player) => player.sim));
+        if (racing) this.collisions.resolve(players.filter((player) => player.finishTime === null && !player.fighter.defeated).map((player) => player.sim));
         if (racing) this.raceTick++;
         if (this.tick % this.snapshotInterval === 0) this.broadcastState();
         if (racing) this.finishIfOver();
@@ -159,16 +159,19 @@ class Room {
 
     finishIfOver() {
         const { finishGraceSeconds, raceTimeoutSeconds } = this.config.room;
-        const everyoneFinished = [...this.players.values()].every((player) => player.finishTime !== null);
+        const players = [...this.players.values()];
+        const everyoneFinished = players.every((player) => player.finishTime !== null || player.fighter.defeated);
+        const lastStanding = players.length > 1 && players.filter((player) => !player.fighter.defeated).length <= 1;
         const graceOver = this.firstFinishTick !== null && this.raceTick - this.firstFinishTick >= this.ticks(finishGraceSeconds);
-        if (everyoneFinished || graceOver || this.raceTick >= this.ticks(raceTimeoutSeconds)) this.finish();
+        if (everyoneFinished || lastStanding || graceOver || this.raceTick >= this.ticks(raceTimeoutSeconds)) this.finish();
     }
 
     ranking() {
         const players = [...this.players.values()];
         const finished = players.filter((player) => player.finishTime !== null).sort((a, b) => a.finishTime - b.finishTime);
-        const unfinished = players.filter((player) => player.finishTime === null).sort((a, b) => b.sim.distance - a.sim.distance);
-        return [...finished, ...unfinished].map((player) => ({
+        const unfinished = players.filter((player) => player.finishTime === null && !player.fighter.defeated).sort((a, b) => b.sim.distance - a.sim.distance);
+        const defeated = players.filter((player) => player.fighter.defeated).sort((a, b) => b.fighter.defeatOrder - a.fighter.defeatOrder);
+        return [...finished, ...unfinished, ...defeated].map((player) => ({
             id: player.id,
             time: player.finishTime === null ? null : round(player.finishTime, 3),
         }));
