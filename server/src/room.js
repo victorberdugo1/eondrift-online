@@ -201,10 +201,11 @@ class Room {
         if (racing) this.combat.step(players);
 
         for (const player of players) {
+            player.advanceInput();
             const finished = player.finishTime !== null;
-            const steer = finished ? 0 : player.input.steer;
+            const steer = finished ? 0 : player.applied.steer;
             const driving = racing && !finished && this.combat.canDrive(player);
-            const throttle = driving ? player.input.throttle : 0;
+            const throttle = driving ? player.applied.throttle : 0;
             const before = player.sim.distance;
             stepShip(player.sim, this.track, steer, throttle, this.dt);
             if (racing && !finished && player.sim.distance >= finishDistance) {
@@ -308,7 +309,7 @@ class Room {
     shotRows() {
         return this.combat
             .shots()
-            .map(({ id, spell, distance, lateral, speed, heading, age }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed), round(heading, 3), round(age, 3)]);
+            .map(({ id, spell, distance, lateral, speed, heading, age, owner }) => [id, spell, round(distance, 1), round(lateral, 1), Math.round(speed), round(heading, 3), round(age, 3), owner]);
     }
 
     broadcastState() {
@@ -316,7 +317,7 @@ class Room {
         const shots = JSON.stringify(this.shotRows());
         const head = `{"t":"state","tick":${this.raceTick},"ack":`;
         for (const player of this.players.values()) {
-            player.sendRaw(`${head}${player.input.seq},"ships":${ships},"shots":${shots}}`, true);
+            player.sendRaw(`${head}${player.applied.seq},"ships":${ships},"shots":${shots}}`, true);
         }
     }
 }

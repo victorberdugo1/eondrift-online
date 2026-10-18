@@ -36,8 +36,9 @@ class ArenaRoom extends Room {
         if (racing) this.combat.step(players);
 
         for (const player of players) {
+            player.advanceInput();
             const driving = racing && this.combat.canDrive(player);
-            stepArenaShip(player.sim, this.arena, driving ? player.input.steer : 0, driving ? player.input.throttle : 0, this.dt);
+            stepArenaShip(player.sim, this.arena, driving ? player.applied.steer : 0, driving ? player.applied.throttle : 0, this.dt);
         }
 
         if (racing) {
@@ -76,7 +77,7 @@ class ArenaRoom extends Room {
     shotRows() {
         return this.combat
             .shots()
-            .map(({ id, spell, x, z, speed, heading, age }) => [id, spell, round(x, 1), round(z, 1), Math.round(speed), round(heading, 3), round(age, 3)]);
+            .map(({ id, spell, x, z, speed, heading, age, owner }) => [id, spell, round(x, 1), round(z, 1), Math.round(speed), round(heading, 3), round(age, 3), owner]);
     }
 }
 

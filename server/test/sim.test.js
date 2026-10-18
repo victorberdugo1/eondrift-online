@@ -94,3 +94,17 @@ test('a full lobby starts after the short full-lobby delay', () => {
     assert.equal(room.phaseTicks, 3 * 60);
     assert.equal(room.isOpen(), false);
 });
+
+test('inputs are consumed one per tick so clients can replay them exactly', () => {
+    const { room, players } = createRace(defaultConfig, ['SERAPH', 'SELENE']);
+    stepUntil(room, () => room.phase === PHASE.RUNNING);
+    const [player] = players;
+    [1, 2, 3].forEach((seq) => player.applyInput({ seq, steer: 0, throttle: 1 }));
+    room.step();
+    assert.equal(player.applied.seq, 1);
+    room.step();
+    assert.equal(player.applied.seq, 2);
+    room.step();
+    room.step();
+    assert.equal(player.applied.seq, 3);
+});

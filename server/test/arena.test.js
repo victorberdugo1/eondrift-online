@@ -277,7 +277,7 @@ test('snapshots carry plane positions for ships and shots', () => {
     assert.ok(Math.abs(row[1] - 12.5) < 0.01 && Math.abs(row[2] - 3) < 0.01);
     assert.equal(row[8], 100);
     assert.equal(state.shots.length, 2);
-    assert.equal(state.shots[0].length, 7);
+    assert.equal(state.shots[0].length, 8);
     assert.equal(state.shots[0][1], 'gun');
 });
 

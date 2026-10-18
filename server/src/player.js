@@ -3,6 +3,7 @@
 const { WebSocket } = require('ws');
 
 const NEUTRAL_INPUT = Object.freeze({ steer: 0, throttle: 0 });
+const PENDING_INPUT_LIMIT = 4;
 
 class Player {
     constructor(id, token, backlogLimit) {
@@ -19,6 +20,8 @@ class Player {
 
     resetRace() {
         this.input = { seq: 0, ...NEUTRAL_INPUT };
+        this.applied = { seq: 0, ...NEUTRAL_INPUT };
+        this.pending = [];
         this.sim = null;
         this.fighter = null;
         this.casts = [];
@@ -28,10 +31,20 @@ class Player {
 
     releaseControls() {
         Object.assign(this.input, NEUTRAL_INPUT);
+        Object.assign(this.applied, NEUTRAL_INPUT);
+        this.pending.length = 0;
     }
 
     applyInput({ seq, steer, throttle }) {
-        if (seq > this.input.seq) this.input = { seq, steer, throttle };
+        if (seq <= this.input.seq) return;
+        this.input = { seq, steer, throttle };
+        this.pending.push(this.input);
+        if (this.pending.length > PENDING_INPUT_LIMIT) this.pending.shift();
+    }
+
+    advanceInput() {
+        const next = this.pending.shift();
+        if (next) this.applied = next;
     }
 
     queueCast(spell, limit) {

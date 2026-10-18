@@ -264,7 +264,7 @@ test('snapshots carry health, energy and shots', () => {
     assert.equal(ship[9], Math.round(((config.combat.maxEnergy - SPELLS.gun.cost + (5 * config.combat.energyPerSecond) / config.tickRate) / config.combat.maxEnergy) * 100));
     assert.equal(state.shots.length, 2);
     assert.equal(state.shots[0][1], 'gun');
-    assert.equal(state.shots[0].length, 7);
+    assert.equal(state.shots[0].length, 8);
 });
 
 test('a versus room closes after two pilots', () => {
