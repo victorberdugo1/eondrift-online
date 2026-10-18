@@ -13,14 +13,23 @@ const sanitizeName = (value, maxLength) => {
 
 const optionalString = (value) => (typeof value === 'string' ? value : null);
 
+const parseMode = (value) => (value === 'deathmatch' || value === 'vs' ? value : 'race');
+
 const parsers = {
-    join: (message, { nameMaxLength }) => ({
-        t: 'join',
-        name: sanitizeName(message.name, nameMaxLength),
-        ship: optionalString(message.ship),
-        track: optionalString(message.track),
-        mode: message.mode === 'deathmatch' || message.mode === 'vs' ? message.mode : 'race',
-    }),
+    lobby: (message) => ({ t: 'lobby', mode: parseMode(message.mode) }),
+    join: (message, { nameMaxLength }) => {
+        const track = optionalString(message.track);
+        const room = optionalString(message.room);
+        if ((track === null) === (room === null)) return null;
+        return {
+            t: 'join',
+            name: sanitizeName(message.name, nameMaxLength),
+            ship: optionalString(message.ship),
+            track,
+            room,
+            mode: parseMode(message.mode),
+        };
+    },
     input: (message) => {
         if (!Number.isSafeInteger(message.seq) || message.seq < 0) return null;
         if (!Number.isFinite(message.steer) || !Number.isFinite(message.throttle)) return null;

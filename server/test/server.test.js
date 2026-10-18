@@ -20,10 +20,21 @@ const joinAs = async (port, name, ship, options = {}) => {
     return { client, joined };
 };
 
+const hostAs = (port, name, ship, options = {}) => joinAs(port, name, ship, { track: 'circle', ...options });
+
+const guestAs = async (port, name, ship, options = {}) => {
+    const scout = await connect(port);
+    await scout.waitFor((m) => m.t === 'hello');
+    scout.send({ t: 'lobby', mode: options.mode });
+    const lobby = await scout.waitFor((m) => m.t === 'lobby');
+    await scout.close();
+    return joinAs(port, name, ship, { room: lobby.room, ...options });
+};
+
 test('two clients are matched into a temporary room and race to the finish', async () => {
     const { server, port } = await startServer();
-    const a = await joinAs(port, 'Ana', 'SERAPH');
-    const b = await joinAs(port, 'Bo', 'IMPERATOR');
+    const a = await hostAs(port, 'Ana', 'SERAPH');
+    const b = await guestAs(port, 'Bo', 'IMPERATOR');
 
     const lobby = await a.client.waitFor((m) => m.t === 'room' && m.players.length === 2);
     assert.deepEqual(lobby.players.map((p) => p.name), ['Ana', 'Bo']);
@@ -59,7 +70,7 @@ test('invalid messages and unknown ships are rejected without dropping the socke
     const client = await connect(port);
     client.socket.send('not json');
     await client.waitFor((m) => m.t === 'error' && m.code === 'bad_message');
-    client.send({ t: 'join', name: 'x', ship: 'NOPE' });
+    client.send({ t: 'join', name: 'x', ship: 'NOPE', track: 'circle' });
     await client.waitFor((m) => m.t === 'error' && m.code === 'unknown_ship');
     client.send({ t: 'join', name: 'x', ship: 'SERAPH', track: 'nowhere' });
     await client.waitFor((m) => m.t === 'error' && m.code === 'unknown_track');
@@ -71,8 +82,8 @@ test('invalid messages and unknown ships are rejected without dropping the socke
 
 test('a dropped client resumes its ship within the grace period', async () => {
     const { server, port } = await startServer();
-    const a = await joinAs(port, 'Ana', 'SERAPH');
-    const b = await joinAs(port, 'Bo', 'SELENE');
+    const a = await hostAs(port, 'Ana', 'SERAPH');
+    const b = await guestAs(port, 'Bo', 'SELENE');
     await a.client.waitFor((m) => m.t === 'room' && m.phase === 'running');
 
     a.client.socket.terminate();
@@ -99,8 +110,8 @@ test('a dropped client resumes its ship within the grace period', async () => {
 
 test('a client that stays disconnected is removed from the race after the grace period', async () => {
     const { server, port } = await startServer();
-    const a = await joinAs(port, 'Ana', 'SERAPH');
-    const b = await joinAs(port, 'Bo', 'SELENE');
+    const a = await hostAs(port, 'Ana', 'SERAPH');
+    const b = await guestAs(port, 'Bo', 'SELENE');
     await a.client.waitFor((m) => m.t === 'room' && m.phase === 'running');
 
     a.client.socket.terminate();
@@ -173,8 +184,8 @@ test('behind a trusted proxy the forwarded client IP is what gets capped', async
 
 test('casts are ignored in the lobby and spend energy once the race runs', async () => {
     const { server, port } = await startServer();
-    const a = await joinAs(port, 'Ana', 'SERAPH');
-    const b = await joinAs(port, 'Bo', 'SELENE');
+    const a = await hostAs(port, 'Ana', 'SERAPH');
+    const b = await guestAs(port, 'Bo', 'SELENE');
 
     a.client.send({ t: 'cast', spell: 'turbo' });
     a.client.send({ t: 'cast', spell: 'nuke' });
@@ -194,12 +205,12 @@ test('casts are ignored in the lobby and spend energy once the race runs', async
 
 test('deathmatch clients are matched into the arena and receive plane snapshots', async () => {
     const { server, port } = await startServer();
-    const a = await joinAs(port, 'Ana', 'SERAPH', { mode: 'deathmatch', track: 'nowhere' });
-    const b = await joinAs(port, 'Bo', 'IMPERATOR', { mode: 'deathmatch' });
+    const a = await hostAs(port, 'Ana', 'SERAPH', { mode: 'deathmatch', track: 'enuma_ichor' });
+    const b = await guestAs(port, 'Bo', 'IMPERATOR', { mode: 'deathmatch' });
 
     const lobby = await a.client.waitFor((m) => m.t === 'room' && m.players.length === 2);
     assert.equal(lobby.mode, 'deathmatch');
-    assert.equal(lobby.track, 'battle');
+    assert.equal(lobby.track, 'enuma_ichor');
     await a.client.waitFor((m) => m.t === 'room' && m.phase === 'running');
 
     const state = await a.client.waitFor((m) => m.t === 'state' && m.ships.length === 2);
@@ -207,5 +218,60 @@ test('deathmatch clients are matched into the arena and receive plane snapshots'
 
     await a.client.close();
     await b.client.close();
+    await server.close();
+});
+
+test('the first pilot picks the stage and later pilots join that stage without choosing one', async () => {
+    const { server, port } = await startServer();
+    const scout = await connect(port);
+    scout.send({ t: 'lobby', mode: 'race' });
+    assert.deepEqual(await scout.waitFor((m) => m.t === 'lobby'), { t: 'lobby', room: null, track: null });
+
+    const a = await hostAs(port, 'Ana', 'SERAPH');
+    const b = await guestAs(port, 'Bo', 'SELENE');
+    const lobby = await b.client.waitFor((m) => m.t === 'room' && m.players.length === 2);
+    assert.equal(lobby.track, 'circle');
+    assert.equal(lobby.host, a.joined.id);
+    assert.equal(server.matchmaker.roomCount(), 1);
+
+    await scout.close();
+    await a.client.close();
+    await b.client.close();
+    await server.close();
+});
+
+test('a join must either pick a stage or name a room, never both and never neither', async () => {
+    const { server, port } = await startServer();
+    const host = await hostAs(port, 'Ana', 'SERAPH');
+    const client = await connect(port);
+    client.send({ t: 'join', name: 'Bo', ship: 'SELENE', track: 'circle', room: 'r1' });
+    await client.waitFor((m) => m.t === 'error' && m.code === 'bad_message');
+    client.send({ t: 'join', name: 'Bo', ship: 'SELENE' });
+    await client.waitFor((m) => m.t === 'error' && m.code === 'bad_message');
+    client.send({ t: 'join', name: 'Bo', ship: 'SELENE', room: 'r99' });
+    await client.waitFor((m) => m.t === 'error' && m.code === 'room_unavailable');
+    client.send({ t: 'join', name: 'Bo', ship: 'SELENE', room: 'r1', mode: 'vs' });
+    await client.waitFor((m) => m.t === 'error' && m.code === 'room_unavailable');
+
+    await client.close();
+    await host.client.close();
+    await server.close();
+});
+
+test('every stage the client offers can be hosted for races and for deathmatch', async () => {
+    const { server, port } = await startServer();
+    const race = await hostAs(port, 'Ana', 'SERAPH', { track: 'circle' });
+    const arena = await hostAs(port, 'Bo', 'SELENE', { mode: 'deathmatch', track: 'resting_soul' });
+    const lobby = await arena.client.waitFor((m) => m.t === 'room');
+    assert.equal(lobby.track, 'resting_soul');
+    assert.equal(server.matchmaker.roomCount(), 2);
+
+    const client = await connect(port);
+    client.send({ t: 'join', name: 'Cy', ship: 'SERAPH', mode: 'deathmatch', track: 'circle' });
+    await client.waitFor((m) => m.t === 'error' && m.code === 'unknown_track');
+
+    await client.close();
+    await race.client.close();
+    await arena.client.close();
     await server.close();
 });

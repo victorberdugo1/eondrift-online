@@ -165,7 +165,7 @@ test('a disabled ship cannot be hit again or cast', () => {
 });
 
 test('turbo adds thrust only while its timer runs', () => {
-    const track = buildTrack(TRACKS.chapter6);
+    const track = buildTrack(TRACKS.enuma_ichor);
     const plain = createShip('SERAPH', 0);
     const boosted = createShip('SERAPH', 0);
     boosted.boost = SPELLS.turbo.boost;
@@ -250,7 +250,7 @@ test('snapshots carry health, energy and shots', () => {
 });
 
 test('a versus room closes after two pilots', () => {
-    const room = new Room({ id: 'v1', trackId: 'chapter6', mode: 'vs', track: gentleTrack, config, onClose: () => {} });
+    const room = new Room({ id: 'v1', trackId: 'enuma_ichor', mode: 'vs', track: gentleTrack, config, onClose: () => {} });
     room.add(fakePlayer(1, 'IMPERATOR'));
     assert.equal(room.isOpen(), true);
     room.add(fakePlayer(2, 'BASTION'));

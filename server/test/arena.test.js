@@ -14,13 +14,13 @@ const { fakePlayer, stepUntil } = require('./helpers');
 const DT = 1 / 60;
 const FACING_NORTH = 0;
 
-const openArena = buildArena({ ...ARENAS.battle, obstacles: [] });
-const battle = buildArenas(ARENAS).battle;
+const openArena = buildArena({ ...ARENAS.enuma_ichor, obstacles: [] });
+const battle = buildArenas(ARENAS).enuma_ichor;
 
 const runningArena = (ships, arena = openArena) => {
     const inboxes = ships.map(() => []);
     const players = ships.map((ship, i) => fakePlayer(i + 1, ship, inboxes[i]));
-    const room = new ArenaRoom({ id: 'd1', trackId: 'battle', mode: 'deathmatch', arena, config, onClose: () => {} });
+    const room = new ArenaRoom({ id: 'd1', trackId: 'enuma_ichor', mode: 'deathmatch', arena, config, onClose: () => {} });
     players.forEach((player) => room.add(player));
     stepUntil(room, () => room.phase === PHASE.RUNNING);
     return { room, players, inboxes };
@@ -31,15 +31,17 @@ const place = (player, x, z, heading = FACING_NORTH, speed = 0) => Object.assign
 const hideAway = (players, except, spacing = 40) =>
     players.filter((player) => !except.includes(player)).forEach((player, i) => place(player, -100 + i * spacing, 100));
 
-test('the battle arena has a spawn ring clear of walls and obstacles', () => {
-    assert.equal(battle.spawns.length, ARENAS.battle.spawnCount);
-    for (const spawn of battle.spawns) {
-        assert.ok(Math.max(Math.abs(spawn.x), Math.abs(spawn.z)) < battle.halfSize - SHIP_RADIUS);
-        for (const obstacle of battle.obstacles) {
-            assert.ok(Math.hypot(spawn.x - obstacle.x, spawn.z - obstacle.z) > obstacle.radius + 4 * SHIP_RADIUS);
+test('every stage arena has a spawn ring clear of walls and obstacles', () => {
+    for (const [id, arena] of Object.entries(buildArenas(ARENAS))) {
+        assert.equal(arena.spawns.length, ARENAS[id].spawnCount, id);
+        for (const spawn of arena.spawns) {
+            assert.ok(Math.max(Math.abs(spawn.x), Math.abs(spawn.z)) < arena.halfSize - SHIP_RADIUS, id);
+            for (const obstacle of arena.obstacles) {
+                assert.ok(Math.hypot(spawn.x - obstacle.x, spawn.z - obstacle.z) > obstacle.radius + 4 * SHIP_RADIUS, id);
+            }
+            const towardCenter = [Math.sin(spawn.heading), -Math.cos(spawn.heading)];
+            assert.ok(towardCenter[0] * spawn.x + towardCenter[1] * spawn.z < 0, id);
         }
-        const towardCenter = [Math.sin(spawn.heading), -Math.cos(spawn.heading)];
-        assert.ok(towardCenter[0] * spawn.x + towardCenter[1] * spawn.z < 0);
     }
 });
 
@@ -81,7 +83,7 @@ test('walls keep a ship inside the arena and bounce it back', () => {
 });
 
 test('obstacles stop a ship from driving through them', () => {
-    const wall = buildArena({ ...ARENAS.battle, obstacles: [{ x: 0, z: -40, radius: 10 }] });
+    const wall = buildArena({ ...ARENAS.enuma_ichor, obstacles: [{ x: 0, z: -40, radius: 10 }] });
     const ship = createArenaShip('BASTION', { x: 0, z: 0, heading: FACING_NORTH });
     for (let i = 0; i < 600; i++) {
         stepArenaShip(ship, wall, 0, 1, DT);
@@ -90,7 +92,7 @@ test('obstacles stop a ship from driving through them', () => {
 });
 
 test('a glancing hit on an obstacle keeps more speed than a head-on one', () => {
-    const wall = buildArena({ ...ARENAS.battle, obstacles: [{ x: 20, z: -40, radius: 10 }] });
+    const wall = buildArena({ ...ARENAS.enuma_ichor, obstacles: [{ x: 20, z: -40, radius: 10 }] });
     const lowestSpeedAfterImpact = (x) => {
         const ship = createArenaShip('SERAPH', { x, z: 0, heading: FACING_NORTH });
         let lowest = Infinity;
@@ -176,7 +178,7 @@ test('a missile ignores a ship behind the shooter', () => {
 });
 
 test('shots are stopped by walls and obstacles', () => {
-    const wall = buildArena({ ...ARENAS.battle, obstacles: [{ x: 0, z: -30, radius: 8 }] });
+    const wall = buildArena({ ...ARENAS.enuma_ichor, obstacles: [{ x: 0, z: -30, radius: 8 }] });
     const { room, players } = runningArena(['IMPERATOR', 'BASTION'], wall);
     const [shooter, target] = players;
     place(shooter, 0, 0);
@@ -268,15 +270,15 @@ test('the room message announces the deathmatch without laps', () => {
     const message = inboxes[0].filter((entry) => entry.t === 'room').at(-1);
     assert.equal(message.mode, 'deathmatch');
     assert.equal(message.laps, 0);
-    assert.equal(room.trackId, 'battle');
+    assert.equal(room.trackId, 'enuma_ichor');
 });
 
 test('the matchmaker routes deathmatch players into an arena room', () => {
-    const matchmaker = createMatchmaker({ config, tracks: {}, arenas: { battle } });
+    const matchmaker = createMatchmaker({ config, tracks: {}, arenas: { enuma_ichor: battle } });
     const first = fakePlayer(1, 'SERAPH');
     const second = fakePlayer(2, 'SELENE');
-    matchmaker.join(first, matchmaker.defaultArenaId, 'deathmatch');
-    matchmaker.join(second, matchmaker.defaultArenaId, 'deathmatch');
+    matchmaker.host(first, 'enuma_ichor', 'deathmatch');
+    matchmaker.join(second, first.room.id);
     assert.ok(first.room instanceof ArenaRoom);
     assert.equal(first.room, second.room);
     assert.equal(matchmaker.roomCount(), 1);

@@ -12,7 +12,7 @@ const { fakePlayer, createRace, stepUntil } = require('./helpers');
 const DT = 1 / 60;
 
 test('track matches the native game geometry', () => {
-    const track = buildTrack(TRACKS.chapter6);
+    const track = buildTrack(TRACKS.enuma_ichor);
     assert.ok(Math.abs(track.length - 1320.2825) < 0.01);
     assert.ok(Math.abs(track.curvatureAt(track.length / 12 + 0.37) - -0.00482539) < 1e-4);
     assert.ok(Math.abs(track.curvatureAt((track.length * 7) / 12 + 0.37) - -0.0103403) < 1e-4);
@@ -20,7 +20,7 @@ test('track matches the native game geometry', () => {
 });
 
 test('ship physics match the native game trajectory', () => {
-    const track = buildTrack(TRACKS.chapter6);
+    const track = buildTrack(TRACKS.enuma_ichor);
     const ship = createShip('AURIGA', -6.75);
     for (let tick = 0; tick < 1800; tick++) {
         const phase = Math.floor(tick / 90) % 3;

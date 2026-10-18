@@ -7,8 +7,10 @@ const createMatchmaker = ({ config, tracks, arenas }) => {
     const rooms = new Map();
     let nextRoomId = 1;
 
-    const openRoom = (trackId, mode) => {
-        const candidates = [...rooms.values()].filter((room) => room.trackId === trackId && room.mode === mode && room.isOpen());
+    const stagesFor = (mode) => (mode === 'deathmatch' ? arenas : tracks);
+
+    const openRoom = (mode) => {
+        const candidates = [...rooms.values()].filter((room) => room.mode === mode && room.isOpen());
         return candidates.reduce((fullest, room) => (room.players.size > fullest.players.size ? room : fullest), candidates[0]);
     };
 
@@ -20,10 +22,14 @@ const createMatchmaker = ({ config, tracks, arenas }) => {
     };
 
     return {
-        defaultTrackId: Object.keys(tracks)[0],
-        defaultArenaId: Object.keys(arenas)[0],
-        hasTrack: (trackId) => Object.hasOwn(tracks, trackId),
-        join: (player, trackId, mode = 'race') => (openRoom(trackId, mode) ?? createRoom(trackId, mode)).add(player),
+        hasStage: (trackId, mode) => Object.hasOwn(stagesFor(mode), trackId),
+        openRoom,
+        canJoin: (roomId, mode) => {
+            const room = rooms.get(roomId);
+            return room !== undefined && room.mode === mode && room.isOpen();
+        },
+        host: (player, trackId, mode) => createRoom(trackId, mode).add(player),
+        join: (player, roomId) => rooms.get(roomId).add(player),
         leave: (player) => player.room?.remove(player),
         step: () => {
             for (const room of rooms.values()) room.step();

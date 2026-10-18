@@ -30,43 +30,14 @@ const SPELLS = Object.freeze({
     },
 });
 
-const TRACKS = Object.freeze({
-    chapter6: {
-        controlPoints: [
-            [0, 0, 0],
-            [120, 4, -30],
-            [240, 10, 0],
-            [320, 20, 90],
-            [280, 12, 200],
-            [160, 0, 240],
-            [60, -6, 330],
-            [-80, 0, 300],
-            [-160, 8, 180],
-            [-120, 14, 60],
-        ],
-        width: 36,
-        laps: 3,
-    },
-});
+const STAGES = require('./stages.json').stages;
 
-const ARENAS = Object.freeze({
-    battle: {
-        halfSize: 130,
-        maxSpeed: 60,
-        spawnCount: 8,
-        spawnRadius: 100,
-        obstacles: [
-            { x: 0, z: 0, radius: 16 },
-            { x: 62, z: 62, radius: 12 },
-            { x: -62, z: 62, radius: 12 },
-            { x: 62, z: -62, radius: 12 },
-            { x: -62, z: -62, radius: 12 },
-            { x: 0, z: 100, radius: 7 },
-            { x: 0, z: -100, radius: 7 },
-            { x: 100, z: 0, radius: 7 },
-            { x: -100, z: 0, radius: 7 },
-        ],
-    },
-});
+const ARENA_DEFAULTS = Object.freeze({ maxSpeed: 60, spawnCount: 8, spawnRadius: 100 });
+
+const SPAWN_RADIUS = Object.freeze({ requiem_eternal: 87, beneath_nadir: 116 });
+
+const TRACKS = Object.freeze(Object.fromEntries(STAGES.map(({ id, track }) => [id, track])));
+
+const ARENAS = Object.freeze(Object.fromEntries(STAGES.map(({ id, arena }) => [id, { ...ARENA_DEFAULTS, spawnRadius: SPAWN_RADIUS[id] ?? ARENA_DEFAULTS.spawnRadius, ...arena }])));
 
 module.exports = { SHIPS, SPELLS, TRACKS, ARENAS };

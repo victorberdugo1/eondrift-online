@@ -198,6 +198,7 @@ class Room {
             t: 'room',
             id: this.id,
             track: this.trackId,
+            host: this.players.keys().next().value ?? null,
             mode: this.mode,
             laps: this.laps,
             phase: this.phase,

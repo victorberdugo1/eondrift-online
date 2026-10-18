@@ -39,12 +39,17 @@ const createGateway = ({ config, matchmaker }) => {
         player.send({ t: 'joined', id: player.id, token: player.token, resumed });
     };
 
+    const handleLobby = (connection, { mode }) => {
+        const room = matchmaker.openRoom(mode);
+        connection.socket.send(JSON.stringify({ t: 'lobby', room: room?.id ?? null, track: room?.trackId ?? null }));
+    };
+
     const handleJoin = (connection, message) => {
         if (message.ship === null || !Object.hasOwn(SHIPS, message.ship)) return sendError(connection, 'unknown_ship');
-        const deathmatch = message.mode === 'deathmatch';
-        const trackId = deathmatch ? matchmaker.defaultArenaId : (message.track ?? matchmaker.defaultTrackId);
-        if (!deathmatch && !matchmaker.hasTrack(trackId)) return sendError(connection, 'unknown_track');
         if (connection.player?.room) return sendError(connection, 'already_in_room');
+        const hosting = message.track !== null;
+        if (hosting && !matchmaker.hasStage(message.track, message.mode)) return sendError(connection, 'unknown_track');
+        if (!hosting && !matchmaker.canJoin(message.room, message.mode)) return sendError(connection, 'room_unavailable');
 
         let player = connection.player;
         if (!player) {
@@ -55,7 +60,8 @@ const createGateway = ({ config, matchmaker }) => {
         }
         player.name = message.name;
         player.shipName = message.ship;
-        matchmaker.join(player, trackId, message.mode);
+        if (hosting) matchmaker.host(player, message.track, message.mode);
+        else matchmaker.join(player, message.room);
     };
 
     const handleResume = (connection, message) => {
@@ -68,6 +74,7 @@ const createGateway = ({ config, matchmaker }) => {
 
     const handlers = {
         ping: (connection, { ts }) => connection.socket.send(JSON.stringify({ t: 'pong', ts })),
+        lobby: handleLobby,
         join: handleJoin,
         resume: handleResume,
         input: (connection, message) => {
