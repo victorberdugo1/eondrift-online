@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const config = require('../src/config');
 const { SPELLS, TRACKS } = require('../src/content');
-const { buildTrack } = require('../src/track');
+const { PAD, buildTrack } = require('../src/track');
 const { parse } = require('../src/protocol');
 const { createShip, stepShip } = require('../src/ship');
 const { PHASE, Room } = require('../src/room');
@@ -12,18 +12,18 @@ const { circleTrack, createRace, fakePlayer, stepUntil } = require('./helpers');
 
 const DT = 1 / 60;
 
-const gentleTrack = buildTrack({
-    controlPoints: Array.from({ length: 12 }, (_, i) => [
-        Math.cos((i / 12) * 2 * Math.PI) * 2000,
-        0,
-        Math.sin((i / 12) * 2 * Math.PI) * 2000,
-    ]),
-    width: 36,
-    laps: 1,
-});
+const gentlePoints = Array.from({ length: 12 }, (_, i) => [
+    Math.cos((i / 12) * 2 * Math.PI) * 2000,
+    0,
+    Math.sin((i / 12) * 2 * Math.PI) * 2000,
+]);
 
-const runningRace = (ships) => {
-    const race = createRace(config, ships, gentleTrack);
+const gentleTrack = buildTrack({ controlPoints: gentlePoints, width: 36, laps: 1 });
+
+const magicTrack = buildTrack({ controlPoints: gentlePoints, width: 36, laps: 1, pads: [[100, 40, 0, PAD.MAGIC]] });
+
+const runningRace = (ships, track = gentleTrack) => {
+    const race = createRace(config, ships, track);
     stepUntil(race.room, () => race.room.phase === PHASE.RUNNING);
     return race;
 };
@@ -58,13 +58,25 @@ test('a spell is refused without enough energy', () => {
     assert.equal(room.combat.shots().length, 0);
 });
 
-test('energy regenerates up to the maximum', () => {
+test('energy does not regenerate away from magic pads', () => {
     const { room, players } = runningRace(['SERAPH', 'SELENE']);
     const [caster] = players;
     caster.fighter.energy = 0;
+    for (let i = 0; i < 60 * 5; i++) room.step();
+    assert.equal(caster.fighter.energy, 0);
+});
+
+test('magic pads refill energy up to the maximum', () => {
+    const { room, players } = runningRace(['SERAPH', 'SELENE'], magicTrack);
+    const [caster, other] = players;
+    place(caster, 110, 0);
+    place(other, 110, 12);
+    caster.fighter.energy = 0;
+    other.fighter.energy = 0;
+    for (let i = 0; i < 6; i++) room.step();
+    assert.ok(Math.abs(caster.fighter.energy - (6 / config.tickRate) * config.combat.magicPadPerSecond) < 1);
+    assert.equal(other.fighter.energy, 0);
     for (let i = 0; i < 60; i++) room.step();
-    assert.ok(Math.abs(caster.fighter.energy - config.combat.energyPerSecond) < 0.5);
-    for (let i = 0; i < 60 * 20; i++) room.step();
     assert.equal(caster.fighter.energy, config.combat.maxEnergy);
 });
 
@@ -261,7 +273,7 @@ test('snapshots carry health, energy and shots', () => {
     const ship = state.ships.find((s) => s[0] === shooter.id);
     assert.equal(ship.length, 11);
     assert.equal(ship[8], 100);
-    assert.equal(ship[9], Math.round(((config.combat.maxEnergy - SPELLS.gun.cost + (5 * config.combat.energyPerSecond) / config.tickRate) / config.combat.maxEnergy) * 100));
+    assert.equal(ship[9], Math.round(((config.combat.maxEnergy - SPELLS.gun.cost) / config.combat.maxEnergy) * 100));
     assert.equal(state.shots.length, 2);
     assert.equal(state.shots[0][1], 'gun');
     assert.equal(state.shots[0].length, 8);

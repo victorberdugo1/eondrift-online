@@ -112,7 +112,7 @@ const createArenaCombat = ({ config, arena }) => {
         },
         step: (players) => {
             for (const player of players) {
-                tickFighter(player, combat, dt);
+                tickFighter(player, combat, dt, combat.energyPerSecond);
                 for (const spell of player.casts.splice(0)) cast(player, spell, players);
             }
             shots = shots.filter((shot) => advance(shot, players));

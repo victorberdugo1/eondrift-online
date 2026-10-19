@@ -76,6 +76,17 @@ test('boost pads fire only in their lane', () => {
     assert.equal(offLane.boost, 0);
 });
 
+test('magic pads never boost and boost pads never refill', () => {
+    const track = buildTrack(TRACKS.enuma_ichor);
+    const [magicStart, , magicLane] = TRACKS.enuma_ichor.pads.find(([, , , kind]) => kind === 1);
+    const ship = driveTo(track, magicStart + 5, 100);
+    ship.lateral = magicLane * 12;
+    stepShip(ship, track, 0, 1, DT);
+    assert.equal(ship.boost, 0);
+    assert.ok(track.onPad(ship.distance, ship.lateral, 1));
+    assert.ok(!track.onPad(ship.distance, ship.lateral, 0));
+});
+
 test('a lone player waits in the lobby forever', () => {
     const { room } = createRace(defaultConfig, ['SERAPH']);
     for (let i = 0; i < 60 * 60; i++) room.step();

@@ -8,6 +8,7 @@ const WORLD_UP = [0, 1, 0];
 const SURFACE_BLEND_FROM = 0.3;
 const SURFACE_BLEND_TO = 0.8;
 const PAD_LANE_WIDTH = 12;
+const PAD = Object.freeze({ BOOST: 0, MAGIC: 1 });
 
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const subtract = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -138,11 +139,14 @@ const buildTrack = ({ controlPoints, width, laps, gaps = [], pads = [] }) => {
         return gaps.find(([start, span]) => wrapped >= start && wrapped < start + span) ?? null;
     };
 
-    const onPad = (along, lateral) => {
+    const onPad = (along, lateral, kind = PAD.BOOST) => {
         const wrapped = alongLap(along);
         return pads.some(
-            ([start, span, lane]) =>
-                wrapped >= start && wrapped < start + span && Math.abs(lateral - lane * PAD_LANE_WIDTH) < PAD_LANE_WIDTH / 2,
+            ([start, span, lane, padKind = PAD.BOOST]) =>
+                padKind === kind &&
+                wrapped >= start &&
+                wrapped < start + span &&
+                Math.abs(lateral - lane * PAD_LANE_WIDTH) < PAD_LANE_WIDTH / 2,
         );
     };
 
@@ -152,4 +156,4 @@ const buildTrack = ({ controlPoints, width, laps, gaps = [], pads = [] }) => {
 const buildTracks = (defs) =>
     Object.fromEntries(Object.entries(defs).map(([id, def]) => [id, buildTrack(def)]));
 
-module.exports = { buildTrack, buildTracks };
+module.exports = { PAD, buildTrack, buildTracks };

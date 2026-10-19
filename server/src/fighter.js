@@ -11,9 +11,9 @@ const createFighter = ({ maxHealth, maxEnergy }) => ({
     defeatOrder: 0,
 });
 
-const tickFighter = (player, combat, dt) => {
+const tickFighter = (player, combat, dt, energyPerSecond) => {
     const { fighter } = player;
-    fighter.energy = Math.min(combat.maxEnergy, fighter.energy + combat.energyPerSecond * dt);
+    fighter.energy = Math.min(combat.maxEnergy, fighter.energy + energyPerSecond * dt);
     fighter.disabledTicks = Math.max(0, fighter.disabledTicks - 1);
     for (const spell of Object.keys(fighter.cooldowns)) fighter.cooldowns[spell] = Math.max(0, fighter.cooldowns[spell] - 1);
 };

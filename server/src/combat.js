@@ -4,6 +4,7 @@ const { SPELLS } = require('./content');
 const { wrapDelta } = require('./collisions');
 const { SHIP_RADIUS } = require('./ship');
 const { moveToward } = require('./math');
+const { PAD } = require('./track');
 const { createFighter, tickFighter, isActive, defeat, castSpell, outgoingDamage, incomingDamage } = require('./fighter');
 
 const createCombat = ({ config, track }) => {
@@ -104,7 +105,7 @@ const createCombat = ({ config, track }) => {
         },
         step: (players) => {
             for (const player of players) {
-                tickFighter(player, combat, dt);
+                tickFighter(player, combat, dt, track.onPad(player.sim.distance, player.sim.lateral, PAD.MAGIC) ? combat.magicPadPerSecond : 0);
                 for (const spell of player.casts.splice(0)) cast(player, spell, players);
             }
             shots = shots.filter((shot) => advance(shot, players));

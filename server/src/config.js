@@ -24,6 +24,7 @@ module.exports = Object.freeze({
         maxHealth: 100,
         maxEnergy: 100,
         energyPerSecond: 12,
+        magicPadPerSecond: 300,
         disabledSeconds: 2,
         respawnHealthFraction: 0.5,
         referenceShield: 5,
