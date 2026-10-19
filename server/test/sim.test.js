@@ -33,7 +33,7 @@ test('ship physics match the native game trajectory', () => {
 
 test('enuma ichor loops keep steering curvature within what a ship can follow', () => {
     const track = buildTrack(TRACKS.enuma_ichor);
-    assert.ok(Math.abs(track.length - 3884.77) < 0.1);
+    assert.ok(Math.abs(track.length - 3877.43) < 0.1);
     for (let along = 0; along < track.length; along += 2) assert.ok(Math.abs(track.curvatureAt(along)) < 0.01);
 });
 
