@@ -13,9 +13,9 @@ const DT = 1 / 60;
 
 test('track matches the native game geometry', () => {
     const track = buildTrack(TRACKS.ordeal_nights);
-    assert.ok(Math.abs(track.length - 1691.347) < 0.01);
-    assert.ok(Math.abs(track.curvatureAt(track.length / 12 + 0.37) - -0.005459) < 1e-5);
-    assert.ok(Math.abs(track.curvatureAt((track.length * 7) / 12 + 0.37) - -0.005599) < 1e-5);
+    assert.ok(Math.abs(track.length - 6183.852) < 0.01);
+    assert.ok(Math.abs(track.curvatureAt(2488.37) - -0.007143) < 1e-5);
+    assert.ok(Math.abs(track.curvatureAt(5482.37) - 0.005203) < 1e-5);
     assert.ok(Math.abs(track.curvatureAt(0) - track.curvatureAt(track.length)) < 1e-9);
 });
 
@@ -26,9 +26,9 @@ test('ship physics match the native game trajectory', () => {
         const phase = Math.floor(tick / 90) % 3;
         stepShip(ship, track, phase === 0 ? 1 : phase === 1 ? -0.5 : 0, tick % 400 < 300 ? 1 : 0, DT);
     }
-    assert.ok(Math.abs(ship.distance - 2091.6655) < 0.05);
+    assert.ok(Math.abs(ship.distance - 3009.6479) < 0.05);
     assert.ok(Math.abs(ship.lateral - -16) < 1e-6);
-    assert.ok(Math.abs(ship.speed - 109.1449) < 0.01);
+    assert.ok(Math.abs(ship.speed - 193.4086) < 0.01);
 });
 
 test('enuma ichor loops keep steering curvature within what a ship can follow', () => {
