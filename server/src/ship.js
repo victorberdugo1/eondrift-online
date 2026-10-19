@@ -19,12 +19,16 @@ const WALL_BOUNCE_HEADING = 0.25;
 const BRAKE_GLOW_RATE = 8;
 const REFERENCE_SPEED = 277.5;
 const BOOST_ACCELERATION = 150;
+const OVERSPEED_SOFTNESS = 5;
 const PAD_BOOST_SECONDS = 1;
 const MIN_JUMP_SPEED = 90;
 const FALL_SPEED = 60;
 const FALL_DEPTH = 40;
 const RESPAWN_BACK = 90;
 const RESPAWN_SPEED_KEPT = 0.4;
+
+const dampedThrust = (thrust, speed) =>
+    thrust <= 0 ? thrust : thrust / (1 + Math.max(0, speed - REFERENCE_SPEED) / OVERSPEED_SOFTNESS);
 
 const resolveWall = (ship, limit, dt) => {
     if (Math.abs(ship.lateral) < limit) return;
@@ -79,7 +83,7 @@ const stepShip = (ship, track, steer, throttle, dt) => {
     ship.brakeGlow = moveToward(ship.brakeGlow, braking ? 1 : 0, BRAKE_GLOW_RATE * dt);
     ship.boost = Math.max(0, ship.boost - dt);
     const thrust = throttle * ACCELERATION - (1 - throttle) * BRAKING + (boosting ? BOOST_ACCELERATION : 0);
-    ship.speed = Math.max(0, ship.speed + thrust * dt);
+    ship.speed = Math.max(0, ship.speed + dampedThrust(thrust, ship.speed) * dt);
 
     const curvature = track.curvatureAt(ship.distance);
     const authority = clamp(ship.speed / TURN_SPEED_RAMP, 0, 1) * Math.max(1, ship.speed / REFERENCE_SPEED);
