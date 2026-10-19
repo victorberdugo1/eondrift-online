@@ -28,6 +28,11 @@ const SPELLS = Object.freeze({
         cooldown: 2,
         projectile: { damage: 40, slow: 0.5, speed: 400, radius: 5, life: 3, homing: 0, arenaSpeed: 140, arenaTurn: 0, barrels: [0], barrelDamageScale: 1 },
     },
+    mine: {
+        cost: 40,
+        cooldown: 1,
+        projectile: { damage: 35, slow: 0.4, speed: 0, radius: 2, life: 25, homing: 0, arenaSpeed: 0, arenaTurn: 0, barrels: [0], barrelDamageScale: 1, drop: 6 },
+    },
 });
 
 const STAGES = require('./stages.json').stages;

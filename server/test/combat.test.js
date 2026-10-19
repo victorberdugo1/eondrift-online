@@ -163,6 +163,21 @@ test('a plasma bolt misses a ship outside its width', () => {
     assert.equal(target.fighter.health, config.combat.maxHealth);
 });
 
+test('a mine stays on the road and damages the first enemy that crosses it', () => {
+    const { room, players } = runningRace(['SERAPH', 'SELENE']);
+    const [layer, victim] = players;
+    place(layer, 400, 0, 100);
+    place(victim, 300, 0, 200);
+    layer.queueCast('mine', config.combat.castQueueLimit);
+    room.step();
+    const [mine] = room.combat.shots();
+    assert.equal(mine.speed, 0);
+    assert.ok(mine.distance < 400);
+    stepUntil(room, () => victim.fighter.health < config.combat.maxHealth, 240);
+    assert.equal(room.combat.shots().length, 0);
+    assert.equal(layer.fighter.health, config.combat.maxHealth);
+});
+
 test('a destroyed ship is stopped, disabled and then recovers at half health', () => {
     const { room, players } = runningRace(['SERAPH', 'SELENE']);
     const [shooter, target] = players;
