@@ -303,6 +303,7 @@ class Room {
             finishTime === null ? null : round(finishTime, 3),
             percent(fighter.health, this.config.combat.maxHealth),
             percent(fighter.energy, this.config.combat.maxEnergy),
+            round(sim.air, 2),
         ]);
     }
 

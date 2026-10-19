@@ -5,6 +5,9 @@ const SAMPLE_STEP = 2;
 const SMOOTH_HALF_WINDOW_LENGTH = 16;
 const SMOOTH_PASSES = 3;
 const WORLD_UP = [0, 1, 0];
+const SURFACE_BLEND_FROM = 0.3;
+const SURFACE_BLEND_TO = 0.8;
+const PAD_LANE_WIDTH = 12;
 
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const subtract = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -27,6 +30,8 @@ const catmullRom = (p0, p1, p2, p3, t) => {
     const t3 = t2 * t;
     return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3);
 };
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const wrap = (index, count) => ((index % count) + count) % count;
 
@@ -78,31 +83,45 @@ const smoothPositions = (positions, step) => {
     return current;
 };
 
-const frameOf = (forward) => {
-    const normalized = normalize(forward);
-    const right = normalize(cross(normalized, WORLD_UP));
-    return { forward: normalized, up: cross(right, normalized) };
+const orientedUp = (forward, previousUp) => {
+    const projected = subtract(WORLD_UP, scale(forward, dot(WORLD_UP, forward)));
+    const transported = normalize(subtract(previousUp, scale(forward, dot(previousUp, forward))));
+    const upright = Math.hypot(...projected);
+    const surface = normalize(projected);
+    const oriented = dot(transported, surface) < 0 ? scale(surface, -1) : surface;
+    const blend = clamp((upright - SURFACE_BLEND_FROM) / (SURFACE_BLEND_TO - SURFACE_BLEND_FROM), 0, 1);
+    return normalize(add(scale(transported, 1 - blend), scale(oriented, blend)));
 };
 
-const computeCurvatures = (positions, step) => {
+const computeFrames = (positions) => {
     const count = positions.length;
-    const frames = positions.map((_, i) =>
-        frameOf(subtract(positions[(i + 1) % count], positions[wrap(i - 1, count)])));
+    let up = WORLD_UP;
+    return positions.map((_, i) => {
+        const forward = normalize(subtract(positions[(i + 1) % count], positions[wrap(i - 1, count)]));
+        up = orientedUp(forward, up);
+        return { forward, up };
+    });
+};
+
+const computeCurvatures = (frames, step) => {
+    const count = frames.length;
     return Float64Array.from(frames, (frame, i) => {
         const turn = cross(frames[wrap(i - 1, count)].forward, frames[(i + 1) % count].forward);
         return dot(turn, frame.up) / (2 * step);
     });
 };
 
-const buildTrack = ({ controlPoints, width, laps }) => {
+const buildTrack = ({ controlPoints, width, laps, gaps = [], pads = [] }) => {
     const path = buildDensePath(controlPoints);
     const length = path.cumulative[path.dense.length];
     const count = Math.round(length / SAMPLE_STEP);
     const step = length / count;
-    const curvatures = computeCurvatures(smoothPositions(resamplePositions(path, count, step), step), step);
+    const curvatures = computeCurvatures(computeFrames(smoothPositions(resamplePositions(path, count, step), step)), step);
+
+    const alongLap = (along) => ((along % length) + length) % length;
 
     const curvatureAt = (along) => {
-        const wrapped = ((along % length) + length) % length;
+        const wrapped = alongLap(along);
         const position = wrapped / step;
         const index = Math.min(Math.floor(position), count - 1);
         return catmullRom(
@@ -114,7 +133,20 @@ const buildTrack = ({ controlPoints, width, laps }) => {
         );
     };
 
-    return Object.freeze({ length, width, laps, curvatureAt });
+    const gapAt = (along) => {
+        const wrapped = alongLap(along);
+        return gaps.find(([start, span]) => wrapped >= start && wrapped < start + span) ?? null;
+    };
+
+    const onPad = (along, lateral) => {
+        const wrapped = alongLap(along);
+        return pads.some(
+            ([start, span, lane]) =>
+                wrapped >= start && wrapped < start + span && Math.abs(lateral - lane * PAD_LANE_WIDTH) < PAD_LANE_WIDTH / 2,
+        );
+    };
+
+    return Object.freeze({ length, width, laps, curvatureAt, gapAt, onPad });
 };
 
 const buildTracks = (defs) =>

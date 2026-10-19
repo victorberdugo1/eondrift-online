@@ -259,7 +259,7 @@ test('snapshots carry health, energy and shots', () => {
     for (let i = 0; i < 6; i++) room.step();
     const state = inboxes[0].filter((m) => m.t === 'state').at(-1);
     const ship = state.ships.find((s) => s[0] === shooter.id);
-    assert.equal(ship.length, 10);
+    assert.equal(ship.length, 11);
     assert.equal(ship[8], 100);
     assert.equal(ship[9], Math.round(((config.combat.maxEnergy - SPELLS.gun.cost + (5 * config.combat.energyPerSecond) / config.tickRate) / config.combat.maxEnergy) * 100));
     assert.equal(state.shots.length, 2);
