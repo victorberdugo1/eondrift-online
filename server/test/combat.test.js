@@ -286,7 +286,7 @@ test('snapshots carry health, energy and shots', () => {
     for (let i = 0; i < 6; i++) room.step();
     const state = inboxes[0].filter((m) => m.t === 'state').at(-1);
     const ship = state.ships.find((s) => s[0] === shooter.id);
-    assert.equal(ship.length, 11);
+    assert.equal(ship.length, 14);
     assert.equal(ship[8], 100);
     assert.equal(ship[9], Math.round(((config.combat.maxEnergy - SPELLS.gun.cost) / config.combat.maxEnergy) * 100));
     assert.equal(state.shots.length, 2);
@@ -300,4 +300,15 @@ test('a versus room closes after two pilots', () => {
     assert.equal(room.isOpen(), true);
     room.add(fakePlayer(2, 'BASTION'));
     assert.equal(room.isOpen(), false);
+});
+
+test('snapshots carry the recovery state of a ship that fell', () => {
+    const { room, players, inboxes } = runningRace(['SERAPH', 'SELENE']);
+    const [faller] = players;
+    Object.assign(faller.sim, { recover: 0.6, recoverFrom: 120, recoverTo: 180 });
+    room.step();
+    const state = inboxes[0].filter((m) => m.t === 'state').at(-1);
+    const ship = state.ships.find((s) => s[0] === faller.id);
+    assert.deepEqual(ship.slice(11), [ship[11], 120, 180]);
+    assert.ok(ship[11] > 0 && ship[11] <= 0.6);
 });

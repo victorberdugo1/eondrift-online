@@ -304,6 +304,9 @@ class Room {
             percent(fighter.health, this.config.combat.maxHealth),
             percent(fighter.energy, this.config.combat.maxEnergy),
             round(sim.air, 2),
+            round(sim.recover, 4),
+            round(sim.recoverFrom, 3),
+            round(sim.recoverTo, 3),
         ]);
     }
 
