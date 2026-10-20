@@ -55,9 +55,10 @@ test('a fast ship clears a jump gap and a slow one falls and respawns before the
     const slow = driveTo(track, start - 0.3, 40);
     stepShip(slow, track, 0, 1, DT);
     assert.ok(slow.air < 0);
-    for (let tick = 0; tick < 120 && slow.air < 0; tick++) stepShip(slow, track, 0, 0, DT);
+    for (let tick = 0; tick < 400 && (slow.air < 0 || slow.recover > 0); tick++) stepShip(slow, track, 0, 0, DT);
+    assert.equal(slow.recover, 0);
     assert.equal(slow.air, 0);
-    assert.ok(Math.abs(slow.distance - (start + span)) < 1e-6);
+    assert.ok(slow.distance > start + span && slow.distance < start + span + 2);
     assert.equal(slow.speed, 0);
     assert.equal(slow.lateral, 0);
 });
@@ -72,9 +73,10 @@ test('a jump that loses its speed mid-air falls to the landing point instead of 
     ship.speed = 0;
     stepShip(ship, track, 0, 0, DT);
     assert.ok(ship.air < 0);
-    for (let tick = 0; tick < 240 && ship.air < 0; tick++) stepShip(ship, track, 0, 0, DT);
+    for (let tick = 0; tick < 400 && (ship.air < 0 || ship.recover > 0); tick++) stepShip(ship, track, 0, 0, DT);
+    assert.equal(ship.recover, 0);
     assert.equal(ship.air, 0);
-    assert.ok(Math.abs(ship.distance - (start + span)) < 1e-6);
+    assert.ok(ship.distance > start + span && ship.distance < start + span + 2);
     assert.equal(ship.speed, 0);
 });
 
@@ -205,13 +207,13 @@ test('a ship that falls on a branch respawns on the same branch', () => {
     const ship = createShip('AURIGA', -60, 720);
     ship.speed = 30;
     const [gapStart, gapSpan] = track.gapAt(760, -30);
-    let falling = false;
-    for (let tick = 0; tick < 600 && !(falling && ship.air === 0); tick++) {
+    let recovering = false;
+    for (let tick = 0; tick < 600 && !(recovering && ship.recover === 0); tick++) {
         stepShip(ship, track, 0, ship.air < 0 ? 0 : 1, DT);
-        if (ship.air < 0) falling = true;
+        if (ship.recover > 0) recovering = true;
     }
-    assert.ok(falling);
-    assert.ok(Math.abs(ship.distance - (gapStart + gapSpan)) < 1e-6);
+    assert.ok(recovering);
+    assert.ok(ship.distance > gapStart + gapSpan && ship.distance < gapStart + gapSpan + 2);
     assert.equal(ship.speed, 0);
     assert.ok(ship.lateral < -40);
 });
@@ -244,4 +246,26 @@ test('new stage lengths', () => {
         assert.ok(Math.abs(buildTrack(TRACKS[id]).length - length) < 0.01, id);
     }
     assert.equal(TRACKS.resting_soul.width, 60);
+});
+
+test('a recovering ship eases out of its fall and into the glide without jumping', () => {
+    const track = buildTrack(TRACKS.enuma_ichor);
+    const [start] = TRACKS.enuma_ichor.gaps[0];
+
+    const ship = driveTo(track, start - 0.3, 40);
+    stepShip(ship, track, 0, 0, DT);
+    const distances = [];
+    for (let tick = 0; tick < 400; tick++) {
+        stepShip(ship, track, 0, 0, DT);
+        if (ship.recover > 0) distances.push(ship.distance);
+        else if (distances.length > 0) {
+            distances.push(ship.distance);
+            break;
+        }
+    }
+    const steps = distances.slice(1).map((d, i) => d - distances[i]);
+    const peak = Math.max(...steps);
+    const glideStart = steps.findIndex((step) => step > 0);
+    assert.ok(Math.abs(steps[glideStart]) < 0.1 * peak);
+    assert.ok(Math.abs(steps[steps.length - 1]) < 0.1 * peak);
 });

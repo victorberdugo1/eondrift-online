@@ -24,6 +24,9 @@ const PAD_BOOST_SECONDS = 1;
 const MIN_JUMP_SPEED = 90;
 const FALL_SPEED = 60;
 const FALL_DEPTH = 40;
+const LANDING_CLEARANCE = 1;
+const RECOVER_SECONDS = 1.2;
+const RECOVER_FLIGHT_SECONDS = RECOVER_SECONDS / 2;
 
 const dampedThrust = (thrust, speed) =>
     thrust <= 0 ? thrust : thrust / (1 + Math.max(0, speed - REFERENCE_SPEED) / OVERSPEED_SOFTNESS);
@@ -52,7 +55,24 @@ const createShip = (name, lateral, distance = 0) => ({
     brakeGlow: 0,
     boost: 0,
     air: 0,
+    recover: 0,
+    recoverFrom: 0,
+    recoverTo: 0,
 });
+
+const smoothstep = (t) => t * t * (3 - 2 * t);
+
+const stepRecovery = (ship, dt) => {
+    ship.recover = Math.max(0, ship.recover - dt);
+    const elapsed = RECOVER_SECONDS - ship.recover;
+    if (elapsed < RECOVER_FLIGHT_SECONDS) {
+        ship.air = -FALL_DEPTH * (1 - smoothstep(elapsed / RECOVER_FLIGHT_SECONDS));
+        return;
+    }
+    ship.air = 0;
+    const progress = Math.min(1, (elapsed - RECOVER_FLIGHT_SECONDS) / RECOVER_FLIGHT_SECONDS);
+    ship.distance = ship.recoverFrom + (ship.recoverTo - ship.recoverFrom) * smoothstep(progress);
+};
 
 const stepAir = (ship, track, dt) => {
     const gap = track.gapAt(ship.distance, ship.lateral);
@@ -65,15 +85,22 @@ const stepAir = (ship, track, dt) => {
     ship.air -= FALL_SPEED * dt;
     if (ship.air >= -FALL_DEPTH) return;
 
-    ship.distance = gap[0] + gap[1];
-    ship.lateral = track.branchCenter(ship.distance, gap[2] ?? 0);
+    ship.air = -FALL_DEPTH;
+    ship.recover = RECOVER_SECONDS;
+    ship.recoverFrom = ship.distance;
+    ship.recoverTo = gap[0] + gap[1] + LANDING_CLEARANCE;
     ship.heading = 0;
     ship.speed = 0;
     ship.boost = 0;
-    ship.air = 0;
 };
 
 const stepShip = (ship, track, steer, throttle, dt) => {
+    if (ship.recover > 0) {
+        stepRecovery(ship, dt);
+        resolveWall(ship, track, dt);
+        return;
+    }
+
     const boosting = ship.boost > 0;
     const braking = throttle <= 0 && !boosting && ship.speed > 0;
     ship.brakeGlow = moveToward(ship.brakeGlow, braking ? 1 : 0, BRAKE_GLOW_RATE * dt);
