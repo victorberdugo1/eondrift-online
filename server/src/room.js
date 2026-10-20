@@ -222,12 +222,10 @@ class Room {
     }
 
     finishIfOver() {
-        const { finishGraceSeconds, raceTimeoutSeconds } = this.config.room;
         const players = [...this.players.values()];
-        const everyoneFinished = players.every((player) => player.finishTime !== null || player.fighter.defeated);
+        const hasWinner = this.firstFinishTick !== null;
         const lastStanding = players.length > 1 && players.filter((player) => !player.fighter.defeated).length <= 1;
-        const graceOver = this.firstFinishTick !== null && this.raceTick - this.firstFinishTick >= this.ticks(finishGraceSeconds);
-        if (everyoneFinished || lastStanding || graceOver || this.raceTick >= this.ticks(raceTimeoutSeconds)) this.finish();
+        if (hasWinner || lastStanding || this.raceTick >= this.ticks(this.config.room.raceTimeoutSeconds)) this.finish();
     }
 
     ranking() {

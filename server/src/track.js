@@ -175,6 +175,9 @@ const buildTrack = ({ controlPoints, width, laps, gaps = [], forks = [], pads = 
         );
     };
 
+    const padCenter = (along, lane) =>
+        lane !== 0 && forkAt(along) !== null ? branchCenter(along, Math.sign(lane)) : lane * PAD_LANE_WIDTH;
+
     const onPad = (along, lateral, kind = PAD.BOOST) => {
         const wrapped = alongLap(along);
         return pads.some(
@@ -182,7 +185,7 @@ const buildTrack = ({ controlPoints, width, laps, gaps = [], forks = [], pads = 
                 padKind === kind &&
                 wrapped >= start &&
                 wrapped < start + span &&
-                Math.abs(lateral - lane * PAD_LANE_WIDTH) < PAD_LANE_WIDTH / 2,
+                Math.abs(lateral - padCenter(wrapped, lane)) < PAD_LANE_WIDTH / 2,
         );
     };
 

@@ -147,15 +147,20 @@ test('a countdown aborts back to the lobby when players drop below the minimum',
     assert.equal(players[0].sim, null);
 });
 
-test('leaving mid-race ends the race for the remaining finished player', () => {
-    const { room, players, isClosed } = createRace(defaultConfig, ['SERAPH', 'SELENE']);
-    stepUntil(room, () => room.phase === PHASE.RUNNING);
-    players[0].applyInput({ seq: 1, steer: 0, throttle: 1 });
-    stepUntil(room, () => players[0].finishTime !== null);
-    assert.equal(room.phase, PHASE.RUNNING);
-    room.remove(players[1]);
-    assert.ok(isClosed());
-});
+for (const mode of ['race', 'vs']) {
+    test(`a ${mode} room ends the moment the first pilot crosses the line`, () => {
+        const { room, players, inboxes, isClosed } = createRace(defaultConfig, ['SERAPH', 'SELENE'], undefined, mode);
+        stepUntil(room, () => room.phase === PHASE.RUNNING);
+        players[0].applyInput({ seq: 1, steer: 0, throttle: 1 });
+        stepUntil(room, () => isClosed() || players[0].finishTime !== null);
+        assert.ok(isClosed());
+
+        const results = inboxes[1].find((message) => message.t === 'results');
+        assert.deepEqual(results.ranking.map((entry) => entry.id), [players[0].id, players[1].id]);
+        assert.ok(results.ranking[0].time > 0);
+        assert.equal(results.ranking[1].time, null);
+    });
+}
 
 test('stale and out-of-order inputs are ignored', () => {
     const player = fakePlayer(1, 'SERAPH');
@@ -268,4 +273,19 @@ test('a recovering ship eases out of its fall and into the glide without jumping
     const glideStart = steps.findIndex((step) => step > 0);
     assert.ok(Math.abs(steps[glideStart]) < 0.1 * peak);
     assert.ok(Math.abs(steps[steps.length - 1]) < 0.1 * peak);
+});
+
+test('every pad sits on the road, following its branch through the forks', () => {
+    for (const [name, definition] of Object.entries(TRACKS)) {
+        const track = buildTrack(definition);
+        for (const [start, span, lane, kind = 0] of definition.pads) {
+            for (let along = start + 0.5; along < start + span; along += 1) {
+                const side = Math.sign(lane);
+                const forked = side !== 0 && track.branchCenter(along, side) !== 0;
+                const center = forked ? track.branchCenter(along, side) : lane * 12;
+                assert.ok(track.onPad(along, center, kind), `${name} pad ${start} misses its own center at ${along}`);
+                assert.ok(Math.abs(track.clampLateral(along, center, 6) - center) < 1e-9, `${name} pad ${start} leaves the road at ${along}`);
+            }
+        }
+    }
 });

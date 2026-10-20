@@ -15,7 +15,7 @@ const CIRCLE_POINTS = Array.from({ length: 8 }, (_, i) => [
 
 const fastConfig = Object.freeze({
     ...config,
-    room: Object.freeze({ ...config.room, lobbyFillSeconds: 0.2, fullLobbySeconds: 0.2, countdownSeconds: 0.2, finishGraceSeconds: 1 }),
+    room: Object.freeze({ ...config.room, lobbyFillSeconds: 0.2, fullLobbySeconds: 0.2, countdownSeconds: 0.2 }),
     resumeGraceMs: 500,
 });
 
@@ -29,11 +29,11 @@ const fakePlayer = (id, ship, inbox = []) => {
     return player;
 };
 
-const createRace = (config, shipNames, track = circleTrack) => {
+const createRace = (config, shipNames, track = circleTrack, mode = 'race') => {
     const inboxes = shipNames.map(() => []);
     const players = shipNames.map((ship, i) => fakePlayer(i + 1, ship, inboxes[i]));
     let closed = false;
-    const room = new Room({ id: 'r1', trackId: 'circle', track, config, onClose: () => (closed = true) });
+    const room = new Room({ id: 'r1', trackId: 'circle', mode, track, config, onClose: () => (closed = true) });
     players.forEach((player) => room.add(player));
     return { room, players, inboxes, isClosed: () => closed };
 };

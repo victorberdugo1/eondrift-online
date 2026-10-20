@@ -42,7 +42,6 @@ module.exports = Object.freeze({
         lobbyFillSeconds: 10,
         fullLobbySeconds: 3,
         countdownSeconds: 3,
-        finishGraceSeconds: 30,
         raceTimeoutSeconds: 600,
         gridSpacing: 4.5,
         versusMaxPlayers: 2,
