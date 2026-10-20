@@ -24,8 +24,6 @@ const PAD_BOOST_SECONDS = 1;
 const MIN_JUMP_SPEED = 90;
 const FALL_SPEED = 60;
 const FALL_DEPTH = 40;
-const RESPAWN_BACK = 90;
-const RESPAWN_SPEED_KEPT = 0.4;
 
 const dampedThrust = (thrust, speed) =>
     thrust <= 0 ? thrust : thrust / (1 + Math.max(0, speed - REFERENCE_SPEED) / OVERSPEED_SOFTNESS);
@@ -56,27 +54,24 @@ const createShip = (name, lateral, distance = 0) => ({
     air: 0,
 });
 
-const stepAir = (ship, track, previousDistance, dt) => {
+const stepAir = (ship, track, dt) => {
     const gap = track.gapAt(ship.distance, ship.lateral);
     if (gap === null) {
         ship.air = 0;
         return;
     }
-    const entered = track.gapAt(previousDistance, ship.lateral) === null;
-    if (entered && ship.speed < MIN_JUMP_SPEED) ship.air = -dt * FALL_SPEED;
-    else if (ship.air < 0) ship.air -= FALL_SPEED * dt;
-    if (ship.air >= 0) return;
+    if (ship.air >= 0 && ship.speed >= MIN_JUMP_SPEED) return;
+    if (ship.air >= 0) ship.air = 0;
+    ship.air -= FALL_SPEED * dt;
+    if (ship.air >= -FALL_DEPTH) return;
 
-    if (ship.air < -FALL_DEPTH) {
-        ship.distance = gap[0] - RESPAWN_BACK;
-        ship.lateral = track.branchCenter(ship.distance, gap[2] ?? 0);
-        ship.heading = 0;
-        ship.speed *= RESPAWN_SPEED_KEPT;
-        ship.boost = 0;
-        ship.air = 0;
-    }
+    ship.distance = gap[0] + gap[1];
+    ship.lateral = track.branchCenter(ship.distance, gap[2] ?? 0);
+    ship.heading = 0;
+    ship.speed = 0;
+    ship.boost = 0;
+    ship.air = 0;
 };
-
 
 const stepShip = (ship, track, steer, throttle, dt) => {
     const boosting = ship.boost > 0;
@@ -95,9 +90,8 @@ const stepShip = (ship, track, steer, throttle, dt) => {
     ship.heading = clamp(ship.heading, -headingLimit, headingLimit);
 
     ship.lateral += ship.speed * Math.sin(ship.heading) * dt;
-    const previousDistance = ship.distance;
     ship.distance += ship.speed * Math.cos(ship.heading) * dt;
-    stepAir(ship, track, previousDistance, dt);
+    stepAir(ship, track, dt);
     if (track.onPad(ship.distance, ship.lateral)) ship.boost = Math.max(ship.boost, PAD_BOOST_SECONDS);
 
     resolveWall(ship, track, dt);

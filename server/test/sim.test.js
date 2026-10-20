@@ -57,8 +57,25 @@ test('a fast ship clears a jump gap and a slow one falls and respawns before the
     assert.ok(slow.air < 0);
     for (let tick = 0; tick < 120 && slow.air < 0; tick++) stepShip(slow, track, 0, 0, DT);
     assert.equal(slow.air, 0);
-    assert.ok(slow.distance < start - 60);
+    assert.ok(Math.abs(slow.distance - (start + span)) < 1e-6);
+    assert.equal(slow.speed, 0);
     assert.equal(slow.lateral, 0);
+});
+
+test('a jump that loses its speed mid-air falls to the landing point instead of hovering', () => {
+    const track = buildTrack(TRACKS.enuma_ichor);
+    const [start, span] = TRACKS.enuma_ichor.gaps[0];
+
+    const ship = driveTo(track, start + 5, 150);
+    stepShip(ship, track, 0, 1, DT);
+    assert.equal(ship.air, 0);
+    ship.speed = 0;
+    stepShip(ship, track, 0, 0, DT);
+    assert.ok(ship.air < 0);
+    for (let tick = 0; tick < 240 && ship.air < 0; tick++) stepShip(ship, track, 0, 0, DT);
+    assert.equal(ship.air, 0);
+    assert.ok(Math.abs(ship.distance - (start + span)) < 1e-6);
+    assert.equal(ship.speed, 0);
 });
 
 test('boost pads fire only in their lane', () => {
@@ -187,14 +204,15 @@ test('a ship that falls on a branch respawns on the same branch', () => {
     const track = buildTrack(TRACKS.requiem_eternal);
     const ship = createShip('AURIGA', -60, 720);
     ship.speed = 30;
-    const gapStart = track.gapAt(760, -30)[0];
-    let previous = ship.distance;
-    for (let tick = 0; tick < 600 && ship.distance >= previous; tick++) {
-        previous = ship.distance;
-        stepShip(ship, track, 0, 1, DT);
+    const [gapStart, gapSpan] = track.gapAt(760, -30);
+    let falling = false;
+    for (let tick = 0; tick < 600 && !(falling && ship.air === 0); tick++) {
+        stepShip(ship, track, 0, ship.air < 0 ? 0 : 1, DT);
+        if (ship.air < 0) falling = true;
     }
-    assert.ok(ship.distance < previous);
-    assert.ok(Math.abs(ship.distance - (gapStart - 90)) < 1e-6);
+    assert.ok(falling);
+    assert.ok(Math.abs(ship.distance - (gapStart + gapSpan)) < 1e-6);
+    assert.equal(ship.speed, 0);
     assert.ok(ship.lateral < -40);
 });
 
