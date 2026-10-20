@@ -208,3 +208,22 @@ test('ships cannot cross the void between branches', () => {
         assert.equal(track.clampLateral(ship.distance, ship.lateral, 2), ship.lateral);
     }
 });
+
+test('every branch jump sits on the flat part of its fork and pads stay on their ribbons', () => {
+    for (const id of ['requiem_eternal', 'resting_soul', 'beneath_nadir', 'nightingale_revenant']) {
+        const def = TRACKS[id];
+        for (const [start, span, side = 0] of def.gaps) {
+            if (side === 0) continue;
+            const fork = def.forks.find(([from, length]) => start - 50 >= from + length * 0.25 && start + span + 50 <= from + length * 0.75);
+            assert.ok(fork, `${id} gap at ${start} is outside a fork plateau`);
+        }
+    }
+});
+
+test('new stage lengths', () => {
+    const lengths = { resting_soul: 4306.91, beneath_nadir: 5463.59, nightingale_revenant: 4697.03 };
+    for (const [id, length] of Object.entries(lengths)) {
+        assert.ok(Math.abs(buildTrack(TRACKS[id]).length - length) < 0.01, id);
+    }
+    assert.equal(TRACKS.resting_soul.width, 60);
+});
