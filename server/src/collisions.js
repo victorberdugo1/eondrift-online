@@ -5,8 +5,6 @@ const { SHIP_RADIUS } = require('./ship');
 
 const wrapDelta = (delta, length) => delta - Math.round(delta / length) * length;
 
-const clamp = (value, limit) => Math.min(Math.max(value, -limit), limit);
-
 const inverseMass = (ship) => 1 / SHIPS[ship.name].shield;
 
 const push = (first, second, overlap, axis) => {
@@ -28,12 +26,10 @@ const exchangeSpeed = (rear, front, restitution) => {
 const createCollisions = ({ config, track }) => {
     const { shipHalfLength } = config.combat;
     const { restitution, headingKick } = config.collision;
-    const wallLimit = track.width * 0.5 - SHIP_RADIUS;
-
     const bumpSideways = (a, b, overlap, direction) => {
         push(a, b, overlap * direction, 'lateral');
-        a.lateral = clamp(a.lateral, wallLimit);
-        b.lateral = clamp(b.lateral, wallLimit);
+        a.lateral = track.clampLateral(a.distance, a.lateral, SHIP_RADIUS);
+        b.lateral = track.clampLateral(b.distance, b.lateral, SHIP_RADIUS);
         a.heading -= direction * headingKick;
         b.heading += direction * headingKick;
     };

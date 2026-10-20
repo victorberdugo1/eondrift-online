@@ -30,11 +30,12 @@ const RESPAWN_SPEED_KEPT = 0.4;
 const dampedThrust = (thrust, speed) =>
     thrust <= 0 ? thrust : thrust / (1 + Math.max(0, speed - REFERENCE_SPEED) / OVERSPEED_SOFTNESS);
 
-const resolveWall = (ship, limit, dt) => {
-    if (Math.abs(ship.lateral) < limit) return;
+const resolveWall = (ship, track, dt) => {
+    const clamped = track.clampLateral(ship.distance, ship.lateral, SHIP_RADIUS);
+    if (clamped === ship.lateral) return;
 
-    const side = Math.sign(ship.lateral);
-    ship.lateral = side * limit;
+    const side = Math.sign(ship.lateral - clamped);
+    ship.lateral = clamped;
 
     const into = ship.heading * side;
     if (into <= 0) return;
@@ -56,19 +57,19 @@ const createShip = (name, lateral, distance = 0) => ({
 });
 
 const stepAir = (ship, track, previousDistance, dt) => {
-    const gap = track.gapAt(ship.distance);
+    const gap = track.gapAt(ship.distance, ship.lateral);
     if (gap === null) {
         ship.air = 0;
         return;
     }
-    const entered = track.gapAt(previousDistance) === null;
+    const entered = track.gapAt(previousDistance, ship.lateral) === null;
     if (entered && ship.speed < MIN_JUMP_SPEED) ship.air = -dt * FALL_SPEED;
     else if (ship.air < 0) ship.air -= FALL_SPEED * dt;
     if (ship.air >= 0) return;
 
     if (ship.air < -FALL_DEPTH) {
         ship.distance = gap[0] - RESPAWN_BACK;
-        ship.lateral = 0;
+        ship.lateral = track.branchCenter(ship.distance, gap[2] ?? 0);
         ship.heading = 0;
         ship.speed *= RESPAWN_SPEED_KEPT;
         ship.boost = 0;
@@ -99,7 +100,7 @@ const stepShip = (ship, track, steer, throttle, dt) => {
     stepAir(ship, track, previousDistance, dt);
     if (track.onPad(ship.distance, ship.lateral)) ship.boost = Math.max(ship.boost, PAD_BOOST_SECONDS);
 
-    resolveWall(ship, track.width * 0.5 - SHIP_RADIUS, dt);
+    resolveWall(ship, track, dt);
 
     const bank = clamp(-curvature * ship.speed * BANK_PER_TURN_RATE, -MAX_BANK, MAX_BANK);
     ship.roll += (steer * ROLL_AT_FULL_STEER + bank - ship.roll) * (1 - Math.exp(-TILT_RESPONSE * dt));

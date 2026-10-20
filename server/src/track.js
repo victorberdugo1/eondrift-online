@@ -8,6 +8,7 @@ const WORLD_UP = [0, 1, 0];
 const SURFACE_BLEND_FROM = 0.3;
 const SURFACE_BLEND_TO = 0.8;
 const PAD_LANE_WIDTH = 12;
+const FORK_RAMP = 0.25;
 const PAD = Object.freeze({ BOOST: 0, MAGIC: 1 });
 
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -112,7 +113,7 @@ const computeCurvatures = (frames, step) => {
     });
 };
 
-const buildTrack = ({ controlPoints, width, laps, gaps = [], pads = [] }) => {
+const buildTrack = ({ controlPoints, width, laps, gaps = [], forks = [], pads = [] }) => {
     const path = buildDensePath(controlPoints);
     const length = path.cumulative[path.dense.length];
     const count = Math.round(length / SAMPLE_STEP);
@@ -134,9 +135,44 @@ const buildTrack = ({ controlPoints, width, laps, gaps = [], pads = [] }) => {
         );
     };
 
-    const gapAt = (along) => {
+    const sideOf = (lateral) => (lateral < 0 ? -1 : 1);
+
+    const forkAt = (along) => {
         const wrapped = alongLap(along);
-        return gaps.find(([start, span]) => wrapped >= start && wrapped < start + span) ?? null;
+        return forks.find(([start, span]) => wrapped >= start && wrapped < start + span) ?? null;
+    };
+
+    const ribbonSpan = (along) => {
+        const half = width / 2;
+        const fork = forkAt(along);
+        if (fork === null) return { inner: 0, outer: half, forked: false };
+
+        const [start, span, spread] = fork;
+        const progress = (alongLap(along) - start) / span;
+        const ramp = Math.min(Math.max(Math.min(progress, 1 - progress) / FORK_RAMP, 0), 1);
+        const envelope = ramp * ramp * (3 - 2 * ramp);
+        return { inner: envelope * (spread - half), outer: half + envelope * spread, forked: true };
+    };
+
+    const clampLateral = (along, lateral, margin) => {
+        const { inner, outer, forked } = ribbonSpan(along);
+        const low = forked ? inner + margin : 0;
+        return sideOf(lateral) * Math.min(Math.max(Math.abs(lateral), low), outer - margin);
+    };
+
+    const branchCenter = (along, side) => {
+        const { inner, outer, forked } = ribbonSpan(along);
+        return forked ? (side * (inner + outer)) / 2 : 0;
+    };
+
+    const gapAt = (along, lateral) => {
+        const wrapped = alongLap(along);
+        return (
+            gaps.find(
+                ([start, span, side = 0]) =>
+                    wrapped >= start && wrapped < start + span && (side === 0 || side === sideOf(lateral)),
+            ) ?? null
+        );
     };
 
     const onPad = (along, lateral, kind = PAD.BOOST) => {
@@ -150,7 +186,7 @@ const buildTrack = ({ controlPoints, width, laps, gaps = [], pads = [] }) => {
         );
     };
 
-    return Object.freeze({ length, width, laps, curvatureAt, gapAt, onPad });
+    return Object.freeze({ length, width, laps, curvatureAt, gapAt, clampLateral, branchCenter, onPad });
 };
 
 const buildTracks = (defs) =>

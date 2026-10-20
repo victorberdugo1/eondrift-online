@@ -164,3 +164,47 @@ test('inputs are consumed one per tick so clients can replay them exactly', () =
     room.step();
     assert.equal(player.applied.seq, 3);
 });
+
+test('requiem eternal splits into two walled branches with their own jumps', () => {
+    const track = buildTrack(TRACKS.requiem_eternal);
+    assert.ok(Math.abs(track.length - 4755.842) < 0.01);
+
+    const plateau = 1000;
+    assert.equal(track.clampLateral(plateau, -10, 2), -track.clampLateral(plateau, 10, 2));
+    assert.ok(Math.abs(track.clampLateral(plateau, 10, 2)) > 40);
+    assert.equal(track.clampLateral(plateau, 60, 2), 60);
+    assert.ok(Math.abs(track.clampLateral(plateau, 100, 2)) < 80);
+    assert.equal(track.clampLateral(plateau * 0 + 100, 100, 2), 16);
+    assert.ok(track.branchCenter(plateau, 1) > 0 && track.branchCenter(plateau, -1) < 0);
+
+    assert.notEqual(track.gapAt(760, -30), null);
+    assert.equal(track.gapAt(760, 30), null);
+    assert.notEqual(track.gapAt(4240, -5), null);
+    assert.notEqual(track.gapAt(4240, 5), null);
+});
+
+test('a ship that falls on a branch respawns on the same branch', () => {
+    const track = buildTrack(TRACKS.requiem_eternal);
+    const ship = createShip('AURIGA', -60, 720);
+    ship.speed = 30;
+    const gapStart = track.gapAt(760, -30)[0];
+    let previous = ship.distance;
+    for (let tick = 0; tick < 600 && ship.distance >= previous; tick++) {
+        previous = ship.distance;
+        stepShip(ship, track, 0, 1, DT);
+    }
+    assert.ok(ship.distance < previous);
+    assert.ok(Math.abs(ship.distance - (gapStart - 90)) < 1e-6);
+    assert.ok(ship.lateral < -40);
+});
+
+test('ships cannot cross the void between branches', () => {
+    const track = buildTrack(TRACKS.requiem_eternal);
+    const ship = createShip('AURIGA', 30, 700);
+    ship.speed = 200;
+    for (let tick = 0; tick < 90; tick++) {
+        stepShip(ship, track, -1, 1, DT);
+        assert.ok(ship.lateral > 0);
+        assert.equal(track.clampLateral(ship.distance, ship.lateral, 2), ship.lateral);
+    }
+});
